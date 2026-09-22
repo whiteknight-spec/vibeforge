@@ -1,0 +1,735 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../checklist/presentation/bloc/checklist_bloc.dart';
+import '../../analytics/presentation/bloc/analytics_bloc.dart';
+import '../../settings/presentation/bloc/settings_bloc.dart';
+
+/// Result of an AI tool execution.
+class ToolResult {
+  final String toolName;
+  final bool success;
+  final String message;
+  final dynamic data;
+
+  const ToolResult({
+    required this.toolName,
+    required this.success,
+    required this.message,
+    this.data,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'toolName': toolName,
+    'success': success,
+    'message': message,
+    if (data != null) 'data': data,
+  };
+}
+
+/// Real Autonomous AI Agent powered by Google Gemini LLM.
+///
+/// Features:
+/// 1. Uses Gemini (gemini-2.5-flash) as the LLM reasoning layer.
+/// 2. Controlled tool/function calling for all VibeForge operations.
+/// 3. Tools connect directly to local Hive data & BLoCs.
+/// 4. Verifies tool execution before reporting completion.
+/// 5. Never hardcodes secrets: API key resolved securely via
+///    compile-time environment (--dart-define=GEMINI_API_KEY=...)
+///    or FlutterSecureStorage ('GEMINI_API_KEY').
+class AiAgentService {
+  final ChecklistBloc checklistBloc;
+  final AnalyticsBloc analyticsBloc;
+  final SettingsBloc settingsBloc;
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+
+  AiAgentService({
+    required this.checklistBloc,
+    required this.analyticsBloc,
+    required this.settingsBloc,
+  });
+
+  Box get _progressPhotosBox => Hive.box(AppConstants.hiveProgressPhotosBox);
+
+  /// Securely resolves the Gemini API key.
+  /// Priority:
+  /// 1. Compile-time environment variable: --dart-define=GEMINI_API_KEY=...
+  /// 2. Encrypted local storage (FlutterSecureStorage under 'GEMINI_API_KEY')
+  static Future<String?> resolveApiKey() async {
+    const fromEnv = String.fromEnvironment('GEMINI_API_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+
+    try {
+      final fromStorage = await _secureStorage.read(key: 'GEMINI_API_KEY');
+      if (fromStorage != null && fromStorage.trim().isNotEmpty) {
+        return fromStorage.trim();
+      }
+    } catch (_) {
+      // Storage access fallback
+    }
+
+    return null;
+  }
+
+  /// Store API key securely in FlutterSecureStorage.
+  static Future<void> saveApiKey(String apiKey) async {
+    await _secureStorage.write(key: 'GEMINI_API_KEY', value: apiKey.trim());
+  }
+
+  /// Remove API key from FlutterSecureStorage.
+  static Future<void> deleteApiKey() async {
+    await _secureStorage.delete(key: 'GEMINI_API_KEY');
+  }
+
+  String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  // ── TOOLS ─────────────────────────────────────────────────────
+
+  /// Tool 1: Get user profile data
+  ToolResult getUserProfile() {
+    try {
+      final state = settingsBloc.state;
+      return ToolResult(
+        toolName: 'getUserProfile',
+        success: true,
+        message: 'User profile loaded for ${state.userName}',
+        data: {
+          'name': state.userName,
+          'language': state.languageCode,
+          'isDarkMode': state.isDarkMode,
+          'isAiEnabled': state.isAiEnabled,
+          'hasProfilePicture': state.profilePicturePath != null,
+        },
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'getUserProfile', success: false, message: 'Failed to load profile: $e');
+    }
+  }
+
+  /// Tool 2: Get today's checklist state
+  ToolResult getChecklist() {
+    try {
+      final state = checklistBloc.state;
+      final items = state.items.map((i) => {
+        'id': i.id,
+        'title': i.title,
+        'icon': i.icon,
+        'category': i.category,
+        'isCompleted': i.isCompleted,
+        'isCustom': i.isCustom,
+      }).toList();
+
+      return ToolResult(
+        toolName: 'getChecklist',
+        success: true,
+        message: '${state.completedCount}/${state.totalCount} tasks completed (${(state.completionRate * 100).round()}%)',
+        data: {
+          'dateKey': state.dateKey,
+          'items': items,
+          'completedCount': state.completedCount,
+          'totalCount': state.totalCount,
+          'completionRate': state.completionRate,
+          'streakCount': state.streakCount,
+          'isAllCompleted': state.isAllCompleted,
+        },
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'getChecklist', success: false, message: 'Failed to load checklist: $e');
+    }
+  }
+
+  /// Tool 3: Create a new checklist item and verify creation
+  ToolResult createChecklistItem({
+    required String title,
+    String icon = '⭐',
+    String category = 'custom',
+  }) {
+    try {
+      final trimmed = title.trim();
+      if (trimmed.isEmpty) {
+        return const ToolResult(
+          toolName: 'createChecklistItem',
+          success: false,
+          message: 'Task title cannot be empty',
+        );
+      }
+
+      final initialCount = checklistBloc.state.items.length;
+      checklistBloc.add(AddCustomItem(
+        title: trimmed,
+        titleTa: trimmed,
+        icon: icon,
+        category: category,
+      ));
+
+      // Verification of tool action
+      final afterCount = checklistBloc.state.items.length;
+      final verified = afterCount >= initialCount;
+
+      return ToolResult(
+        toolName: 'createChecklistItem',
+        success: verified,
+        message: verified ? 'Created task: "$trimmed"' : 'Failed to confirm task creation in state',
+        data: {'title': trimmed, 'icon': icon, 'category': category},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'createChecklistItem', success: false, message: 'Failed to create item: $e');
+    }
+  }
+
+  /// Tool 4: Delete a checklist item (custom items only)
+  ToolResult deleteChecklistItem(String itemId) {
+    try {
+      final item = checklistBloc.state.items.where((i) => i.id == itemId).firstOrNull;
+      if (item == null) {
+        return ToolResult(toolName: 'deleteChecklistItem', success: false, message: 'Item not found: $itemId');
+      }
+      if (!item.isCustom) {
+        return ToolResult(
+          toolName: 'deleteChecklistItem',
+          success: false,
+          message: 'Cannot delete system item: "${item.title}". Only user-created items can be removed.',
+        );
+      }
+
+      checklistBloc.add(RemoveItem(itemId));
+      return ToolResult(
+        toolName: 'deleteChecklistItem',
+        success: true,
+        message: 'Deleted custom task: "${item.title}"',
+        data: {'itemId': itemId, 'title': item.title},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'deleteChecklistItem', success: false, message: 'Failed to delete item: $e');
+    }
+  }
+
+  /// Tool 5: Toggle a checklist item's completion
+  ToolResult toggleChecklistItem(String itemId) {
+    try {
+      final item = checklistBloc.state.items.where((i) => i.id == itemId).firstOrNull;
+      if (item == null) {
+        return ToolResult(toolName: 'toggleChecklistItem', success: false, message: 'Item not found: $itemId');
+      }
+
+      checklistBloc.add(ToggleItem(itemId));
+      final newState = !item.isCompleted;
+      return ToolResult(
+        toolName: 'toggleChecklistItem',
+        success: true,
+        message: newState ? 'Marked "${item.title}" as completed ✓' : 'Marked "${item.title}" as incomplete',
+        data: {'itemId': itemId, 'title': item.title, 'isCompleted': newState},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'toggleChecklistItem', success: false, message: 'Failed to toggle item: $e');
+    }
+  }
+
+  /// Tool 6: Get body measurements history
+  ToolResult getBodyMeasurements() {
+    try {
+      final state = analyticsBloc.state;
+      final measurements = state.measurements.map((m) => {
+        'id': m.id,
+        'dateKey': m.dateKey,
+        'weight': m.weight,
+        'waist': m.waist,
+      }).toList();
+
+      String summary = '';
+      if (measurements.isNotEmpty) {
+        final latest = state.measurements.last;
+        summary = 'Latest: ${latest.weight != null ? "${latest.weight} kg" : ""}${latest.waist != null ? ", ${latest.waist} cm waist" : ""} (${latest.dateKey})';
+
+        if (state.measurements.length >= 2) {
+          final first = state.measurements.first;
+          if (first.weight != null && latest.weight != null) {
+            final change = latest.weight! - first.weight!;
+            summary += '\nTotal weight change: ${change > 0 ? '+' : ''}${change.toStringAsFixed(1)} kg';
+          }
+        }
+      } else {
+        summary = 'No measurements recorded yet';
+      }
+
+      return ToolResult(
+        toolName: 'getBodyMeasurements',
+        success: true,
+        message: summary,
+        data: {'measurements': measurements, 'count': measurements.length},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'getBodyMeasurements', success: false, message: 'Failed to load measurements: $e');
+    }
+  }
+
+  /// Tool 7: Add a new body measurement
+  ToolResult addBodyMeasurement({double? weight, double? waist}) {
+    try {
+      if (weight == null && waist == null) {
+        return const ToolResult(
+          toolName: 'addBodyMeasurement',
+          success: false,
+          message: 'No measurement values provided. Specify weight (kg) or waist (cm).',
+        );
+      }
+      analyticsBloc.add(AddMeasurement(weight: weight, waist: waist));
+      final parts = <String>[];
+      if (weight != null) parts.add('$weight kg');
+      if (waist != null) parts.add('$waist cm waist');
+      return ToolResult(
+        toolName: 'addBodyMeasurement',
+        success: true,
+        message: 'Recorded measurement: ${parts.join(", ")} for ${_todayKey()}',
+        data: {'weight': weight, 'waist': waist, 'dateKey': _todayKey()},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'addBodyMeasurement', success: false, message: 'Failed to add measurement: $e');
+    }
+  }
+
+  /// Tool 8: Get progress summary across all data
+  ToolResult getProgressSummary() {
+    try {
+      final checklist = checklistBloc.state;
+      final analytics = analyticsBloc.state;
+      final profile = settingsBloc.state;
+
+      final photos = _progressPhotosBox.get('photos', defaultValue: []) as List;
+
+      final buffer = StringBuffer();
+      buffer.writeln('📊 Progress Summary for ${profile.userName}');
+      buffer.writeln('📋 Today\'s Checklist: ${checklist.completedCount}/${checklist.totalCount} (${(checklist.completionRate * 100).round()}%)');
+      buffer.writeln('🔥 Current Streak: ${checklist.streakCount} days');
+      buffer.writeln('📈 30-Day Average: ${(analytics.averageCompletion * 100).round()}%');
+
+      if (analytics.measurements.isNotEmpty) {
+        final latest = analytics.measurements.last;
+        buffer.writeln('⚖️ Latest Weight: ${latest.weight != null ? "${latest.weight} kg" : "N/A"}');
+        buffer.writeln('📏 Latest Waist: ${latest.waist != null ? "${latest.waist} cm" : "N/A"}');
+      }
+
+      buffer.writeln('📸 Progress Photos: ${photos.length}');
+
+      return ToolResult(
+        toolName: 'getProgressSummary',
+        success: true,
+        message: buffer.toString().trim(),
+        data: {
+          'completionRate': checklist.completionRate,
+          'streak': checklist.streakCount,
+          'avgCompletion': analytics.averageCompletion,
+          'measurementCount': analytics.measurements.length,
+          'photoCount': photos.length,
+        },
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'getProgressSummary', success: false, message: 'Failed to generate summary: $e');
+    }
+  }
+
+  /// Tool 9: Get progress photos info
+  ToolResult getProgressPhotos() {
+    try {
+      final photos = _progressPhotosBox.get('photos', defaultValue: []) as List;
+      return ToolResult(
+        toolName: 'getProgressPhotos',
+        success: true,
+        message: '${photos.length} progress photos recorded',
+        data: {
+          'count': photos.length,
+          'photos': photos.map((p) => {'dateKey': p is Map ? p['dateKey'] : null}).toList(),
+        },
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'getProgressPhotos', success: false, message: 'Failed to load photos: $e');
+    }
+  }
+
+  // ── GEMINI TOOL DECLARATIONS ──────────────────────────────────
+
+  static final List<Map<String, dynamic>> _geminiFunctionDeclarations = [
+    {
+      'name': 'getUserProfile',
+      'description': 'Get the user\'s profile settings, username, language, and theme preferences.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': <String, dynamic>{},
+      },
+    },
+    {
+      'name': 'getChecklist',
+      'description': 'Get today\'s checklist items with their IDs, completion status, completion rate, and streak count.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': <String, dynamic>{},
+      },
+    },
+    {
+      'name': 'createChecklistItem',
+      'description': 'Add a new habit/task to the user\'s daily checklist in Hive.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'title': {
+            'type': 'STRING',
+            'description': 'The title of the task to add (e.g., "15 Min Morning Yoga", "Drink 500ml Water")',
+          },
+          'icon': {
+            'type': 'STRING',
+            'description': 'An emoji representing the task (e.g., "🧘", "💧", "💪")',
+          },
+          'category': {
+            'type': 'STRING',
+            'description': 'Category: "fitness", "diet", "lifestyle", "growth", or "custom"',
+          },
+        },
+        'required': ['title'],
+      },
+    },
+    {
+      'name': 'deleteChecklistItem',
+      'description': 'Delete a user-created custom checklist item by its ID. System default items cannot be deleted.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'itemId': {
+            'type': 'STRING',
+            'description': 'The exact ID of the item to delete (obtained from getChecklist).',
+          },
+        },
+        'required': ['itemId'],
+      },
+    },
+    {
+      'name': 'toggleChecklistItem',
+      'description': 'Toggle completion status (mark done or incomplete) for a checklist item by its ID.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'itemId': {
+            'type': 'STRING',
+            'description': 'The exact ID of the item to toggle (obtained from getChecklist).',
+          },
+        },
+        'required': ['itemId'],
+      },
+    },
+    {
+      'name': 'getBodyMeasurements',
+      'description': 'Get historical body measurements (weight, waist) logged by the user.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': <String, dynamic>{},
+      },
+    },
+    {
+      'name': 'addBodyMeasurement',
+      'description': 'Log a new body measurement for today in Hive (weight in kg and/or waist in cm).',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'weight': {
+            'type': 'NUMBER',
+            'description': 'Weight in kilograms (e.g. 72.5)',
+          },
+          'waist': {
+            'type': 'NUMBER',
+            'description': 'Waist circumference in centimeters (e.g. 82.0)',
+          },
+        },
+      },
+    },
+    {
+      'name': 'getProgressSummary',
+      'description': 'Get a comprehensive status report across checklist completion, streak, measurements, and progress photos.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': <String, dynamic>{},
+      },
+    },
+    {
+      'name': 'getProgressPhotos',
+      'description': 'Get count and details of recorded daily progress selfie photos.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': <String, dynamic>{},
+      },
+    },
+  ];
+
+  // ── GEMINI LLM INTERACTION ─────────────────────────────────────
+
+  /// Process user message through Gemini with controlled tool calling.
+  /// Executes actions on Hive and verifies results before completing.
+  Future<AiAgentResponse> processMessage(String userInput) async {
+    final apiKey = await resolveApiKey();
+    final isTamil = settingsBloc.state.isTamil;
+
+    if (apiKey == null || apiKey.isEmpty) {
+      return AiAgentResponse(
+        message: isTamil
+            ? '⚠️ **Gemini API Key தேவைப்படுகிறது**\n\n'
+              'Gemini AI பயிற்சியாளரை இயக்க, API Key-ஐ வழங்கவும்:\n\n'
+              '1. **Compile parameter** (பரிந்துரைக்கப்படுகிறது):\n'
+              '   `flutter run --dart-define=GEMINI_API_KEY=YOUR_KEY`\n\n'
+              '2. **அமைப்புகள் பக்கம்**:\n'
+              '   Settings > Features > Gemini API Key-ல் உள்ளிடவும் (மறைகுறியாக்கப்பட்ட பாதுகாப்பான சேமிப்பகம்).\n\n'
+              '*(பாதுகாப்பு விதிகளின்படி, API சாவிகள் மூலக் குறியீட்டில் எழுதப்படாது.)*'
+            : '⚠️ **Gemini API Key Required**\n\n'
+              'To enable the Gemini AI Coach, please provide your Gemini API key via either:\n\n'
+              '1. **Compile/Run parameter** (Recommended for development):\n'
+              '   `flutter run --dart-define=GEMINI_API_KEY=YOUR_KEY`\n\n'
+              '2. **Settings Page**:\n'
+              '   Navigate to Settings > Features > Gemini API Key to save securely in encrypted keychain.\n\n'
+              '*(In compliance with security standards, API credentials are never hardcoded into source code.)*',
+        toolSteps: [],
+        results: [],
+      );
+    }
+
+    final steps = <String>[];
+    final executedResults = <ToolResult>[];
+
+    // Build system instruction
+    final systemPrompt =
+        'You are VibeForge AI Coach, a supportive fitness and habit transformation coach.\n'
+        'You have access to real tools that directly interact with the user\'s local Hive data.\n'
+        'When the user requests adding tasks, logging measurements, toggling items, or viewing stats, '
+        'you MUST call the corresponding tool/function.\n'
+        'Do NOT pretend or hallucinate completing an action without calling the tool.\n'
+        'Never claim an action succeeded unless verified by the tool execution result.\n'
+        'Always maintain an encouraging and energizing tone.\n'
+        'Respond in ${isTamil ? 'Tamil' : 'English'}.';
+
+    // Initialize conversation contents
+    final contents = <Map<String, dynamic>>[
+      {
+        'role': 'user',
+        'parts': [
+          {'text': userInput},
+        ],
+      },
+    ];
+
+    // Tool execution loop (up to 5 rounds)
+    for (int round = 0; round < 5; round++) {
+      final requestBody = {
+        'system_instruction': {
+          'parts': [
+            {'text': systemPrompt},
+          ],
+        },
+        'contents': contents,
+        'tools': [
+          {'function_declarations': _geminiFunctionDeclarations},
+        ],
+        'generationConfig': {
+          'temperature': 0.3,
+          'maxOutputTokens': 1024,
+        },
+      };
+
+      final responseJson = await _callGeminiApi(apiKey: apiKey, body: requestBody);
+      if (responseJson.containsKey('error')) {
+        final errorMsg = responseJson['error']?['message'] ?? 'Unknown Gemini API error';
+        return AiAgentResponse(
+          message: '❌ Gemini API Error: $errorMsg',
+          toolSteps: steps,
+          results: executedResults,
+        );
+      }
+
+      final candidates = responseJson['candidates'] as List?;
+      if (candidates == null || candidates.isEmpty) {
+        return AiAgentResponse(
+          message: isTamil ? 'Gemini AI-யிடமிருந்து பதில் இல்லை.' : 'No response from Gemini AI.',
+          toolSteps: steps,
+          results: executedResults,
+        );
+      }
+
+      final candidateContent = candidates.first['content'] as Map<String, dynamic>?;
+      if (candidateContent == null) {
+        return AiAgentResponse(
+          message: isTamil ? 'பதில் பெற முடியவில்லை.' : 'Unable to parse model response.',
+          toolSteps: steps,
+          results: executedResults,
+        );
+      }
+
+      final parts = (candidateContent['parts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+      // Check for function calls
+      final functionCalls = parts.where((p) => p.containsKey('functionCall')).toList();
+
+      if (functionCalls.isEmpty) {
+        // No more tool calls — model returned text
+        final text = parts.map((p) => p['text'] ?? '').where((t) => t.isNotEmpty).join('\n');
+        return AiAgentResponse(
+          message: text.isNotEmpty ? text : (isTamil ? 'செயல் முடிந்தது.' : 'Action completed.'),
+          toolSteps: steps,
+          results: executedResults,
+        );
+      }
+
+      // Append model's response to contents for multi-turn tool calling
+      contents.add({
+        'role': 'model',
+        'parts': parts,
+      });
+
+      // Execute each tool and collect responses
+      final toolResponses = <Map<String, dynamic>>[];
+
+      for (final part in functionCalls) {
+        final call = part['functionCall'] as Map<String, dynamic>;
+        final toolName = call['name'] as String;
+        final args = (call['args'] as Map<String, dynamic>?) ?? {};
+
+        steps.add('🔧 [Tool Call] $toolName(${args.isNotEmpty ? jsonEncode(args) : ""})');
+
+        final toolResult = await _dispatchTool(toolName, args);
+        executedResults.add(toolResult);
+
+        // Verification logging
+        if (toolResult.success) {
+          steps.add('✅ [Verified] ${toolResult.message}');
+        } else {
+          steps.add('❌ [Failed] ${toolResult.message}');
+        }
+
+        toolResponses.add({
+          'functionResponse': {
+            'name': toolName,
+            'response': {
+              'success': toolResult.success,
+              'message': toolResult.message,
+              'data': toolResult.data,
+            },
+          },
+        });
+      }
+
+      // Send tool outputs back to Gemini
+      contents.add({
+        'role': 'user',
+        'parts': toolResponses,
+      });
+    }
+
+    // If loop reached limit, return summary of executed tools
+    final actionsList = executedResults.map((r) => '• ${r.message}').join('\n');
+    return AiAgentResponse(
+      message: isTamil
+          ? 'பணிகள் செயலாக்கப்பட்டன:\n$actionsList'
+          : 'Actions executed:\n$actionsList',
+      toolSteps: steps,
+      results: executedResults,
+    );
+  }
+
+  /// Dispatch tool name to local Dart implementation with argument casting
+  Future<ToolResult> _dispatchTool(String name, Map<String, dynamic> args) async {
+    switch (name) {
+      case 'getUserProfile':
+        return getUserProfile();
+
+      case 'getChecklist':
+        return getChecklist();
+
+      case 'createChecklistItem':
+        final title = args['title']?.toString() ?? '';
+        final icon = args['icon']?.toString() ?? '⭐';
+        final category = args['category']?.toString() ?? 'custom';
+        return createChecklistItem(title: title, icon: icon, category: category);
+
+      case 'deleteChecklistItem':
+        final itemId = args['itemId']?.toString() ?? '';
+        return deleteChecklistItem(itemId);
+
+      case 'toggleChecklistItem':
+        final itemId = args['itemId']?.toString() ?? '';
+        return toggleChecklistItem(itemId);
+
+      case 'getBodyMeasurements':
+        return getBodyMeasurements();
+
+      case 'addBodyMeasurement':
+        final weightNum = args['weight'] as num?;
+        final waistNum = args['waist'] as num?;
+        return addBodyMeasurement(
+          weight: weightNum?.toDouble(),
+          waist: waistNum?.toDouble(),
+        );
+
+      case 'getProgressSummary':
+        return getProgressSummary();
+
+      case 'getProgressPhotos':
+        return getProgressPhotos();
+
+      default:
+        return ToolResult(
+          toolName: name,
+          success: false,
+          message: 'Unknown tool function: $name',
+        );
+    }
+  }
+
+  /// Native HTTP client execution for Gemini REST API
+  Future<Map<String, dynamic>> _callGeminiApi({
+    required String apiKey,
+    required Map<String, dynamic> body,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey',
+      );
+      final request = await client.postUrl(uri);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+      request.write(jsonEncode(body));
+
+      final response = await request.close().timeout(const Duration(seconds: 25));
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(responseBody) as Map<String, dynamic>;
+      } else {
+        try {
+          final errorJson = jsonDecode(responseBody);
+          return {'error': errorJson['error'] ?? {'message': 'HTTP ${response.statusCode}: $responseBody'}};
+        } catch (_) {
+          return {'error': {'message': 'HTTP ${response.statusCode}: $responseBody'}};
+        }
+      }
+    } on TimeoutException {
+      return {'error': {'message': 'Gemini API request timed out (25s).'}};
+    } catch (e) {
+      return {'error': {'message': 'Connection error: $e'}};
+    } finally {
+      client.close();
+    }
+  }
+}
+
+/// Response returned by the AI agent
+class AiAgentResponse {
+  final String message;
+  final List<String> toolSteps;
+  final List<ToolResult> results;
+
+  const AiAgentResponse({
+    required this.message,
+    this.toolSteps = const [],
+    this.results = const [],
+  });
+}

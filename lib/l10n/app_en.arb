@@ -1,0 +1,179 @@
+{
+  "@@locale": "en",
+
+  "appName": "VibeForge",
+  "appTagline": "Forge Your Best Self",
+
+  "greeting_morning": "Good morning",
+  "greeting_afternoon": "Good afternoon",
+  "greeting_evening": "Good evening",
+  "greeting_night": "Hey night owl",
+
+  "nav_home": "Home",
+  "nav_checklist": "Checklist",
+  "nav_analytics": "Analytics",
+  "nav_ai": "AI Coach",
+  "nav_settings": "Settings",
+
+  "home_title": "Dashboard",
+  "home_streak": "Day Streak",
+  "home_todayProgress": "Today's Progress",
+  "home_weeklyGoal": "Weekly Goal",
+  "home_completionRate": "Completion Rate",
+  "home_transformationPic": "Weekly Selfie",
+  "home_takeSelfie": "Take your weekly transformation selfie",
+  "home_viewTimeline": "View Timeline",
+
+  "checklist_title": "Daily Checklist",
+  "checklist_addItem": "Add Item",
+  "checklist_editItem": "Edit Item",
+  "checklist_deleteItem": "Delete Item",
+  "checklist_completed": "Completed!",
+  "checklist_allDone": "All tasks completed! 🔥",
+  "checklist_itemName": "Item Name",
+  "checklist_notes": "Notes",
+  "checklist_addPhoto": "Add Photo",
+  "checklist_addVideo": "Add Video",
+  "checklist_timeLogged": "Time",
+  "checklist_reorder": "Hold & drag to reorder",
+  "checklist_empty": "No items yet. Tap + to add your first goal!",
+  "checklist_resetDay": "Reset Day",
+  "checklist_customItem": "Custom Item",
+  "checklist_category": "Category",
+  "checklist_category_lifestyle": "Lifestyle",
+  "checklist_category_diet": "Diet",
+  "checklist_category_growth": "Growth",
+  "checklist_category_fitness": "Fitness",
+  "checklist_category_health": "Health",
+  "checklist_category_custom": "Custom",
+
+  "celebration_title": "Amazing! 🎉",
+  "celebration_subtitle": "You completed all your goals today!",
+  "celebration_streak": "{count} Day Streak!",
+  "@celebration_streak": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "analytics_title": "Analytics",
+  "analytics_daily": "Daily",
+  "analytics_weekly": "Weekly",
+  "analytics_monthly": "Monthly",
+  "analytics_completionRate": "Completion Rate",
+  "analytics_streakCalendar": "Streak Calendar",
+  "analytics_weightProgress": "Weight Progress",
+  "analytics_workoutConsistency": "Workout Consistency",
+  "analytics_measurements": "Body Measurements",
+  "analytics_waist": "Waist (cm)",
+  "analytics_weight": "Weight (kg)",
+  "analytics_noData": "Start tracking to see your progress!",
+  "analytics_addMeasurement": "Add Measurement",
+
+  "ai_title": "AI Coach",
+  "ai_motivation": "Daily Motivation",
+  "ai_workout": "Workout Suggestion",
+  "ai_diet": "Diet Suggestion",
+  "ai_photoAnalysis": "Photo Analysis",
+  "ai_weeklySummary": "Weekly Summary",
+  "ai_voiceLog": "Voice Log",
+  "ai_voicePrompt": "Speak your activity...",
+  "ai_disclaimer": "AI estimation only — not medical advice",
+  "ai_generating": "Generating...",
+  "ai_error": "Couldn't generate response. Try again later.",
+  "ai_disabled": "AI features are disabled. Enable in Settings.",
+  "ai_chatPlaceholder": "Ask me anything about your fitness journey...",
+  "ai_send": "Send",
+
+  "media_takePhoto": "Take Photo",
+  "media_chooseGallery": "Choose from Gallery",
+  "media_recordVideo": "Record Video (30s max)",
+  "media_uploading": "Uploading...",
+  "media_uploadSuccess": "Upload successful!",
+  "media_uploadFailed": "Upload failed. Will retry when online.",
+  "media_encrypted": "Encrypted & Secure",
+  "media_front": "Front",
+  "media_side": "Side",
+  "media_back": "Back",
+
+  "transformation_title": "Transformation",
+  "transformation_weekly": "Weekly Selfie",
+  "transformation_timeline": "Timeline",
+  "transformation_beforeAfter": "Before / After",
+  "transformation_takeNow": "Take Your Weekly Selfie",
+  "transformation_noPhotos": "Start your transformation journey with your first photo!",
+
+  "recap_title": "Weekly Recap",
+  "recap_day": "Day {number}",
+  "@recap_day": {
+    "placeholders": {
+      "number": { "type": "int" }
+    }
+  },
+  "recap_completed": "{count} tasks completed",
+  "@recap_completed": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "recap_bestDay": "Best Day",
+  "recap_totalStreak": "Total Streak",
+
+  "settings_title": "Settings",
+  "settings_language": "Language",
+  "settings_theme": "Theme",
+  "settings_darkMode": "Dark Mode",
+  "settings_lightMode": "Light Mode",
+  "settings_cloudBackup": "Cloud Backup",
+  "settings_cloudBackupDesc": "Sync your data to Firebase (encrypted)",
+  "settings_aiFeatures": "AI Features",
+  "settings_aiFeaturesDesc": "Enable AI-powered suggestions and analysis",
+  "settings_privacy": "Privacy Policy",
+  "settings_about": "About VibeForge",
+  "settings_signOut": "Sign Out",
+  "settings_deleteAccount": "Delete Account",
+  "settings_version": "Version {version}",
+  "@settings_version": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+
+  "privacy_title": "Privacy & Security",
+  "privacy_photoPolicy": "Your photos never leave your device unless you explicitly enable cloud backup.",
+  "privacy_encryptionPolicy": "All media is encrypted with AES-256 on your device.",
+  "privacy_noThirdParty": "No third-party analytics track your personal photos or data.",
+  "privacy_firebasePolicy": "When cloud backup is enabled, only you can access your data through authenticated Firebase Storage.",
+
+  "auth_signIn": "Sign in with Google",
+  "auth_signingIn": "Signing in...",
+  "auth_signInError": "Sign in failed. Please try again.",
+  "auth_signOut": "Sign Out",
+  "auth_welcome": "Welcome to VibeForge",
+  "auth_tagline": "Your personal transformation journey starts here",
+
+  "onboarding_title1": "Track Your Habits",
+  "onboarding_desc1": "Build consistency in diet, exercise, coding, and lifestyle with a beautiful daily checklist.",
+  "onboarding_title2": "See Your Progress",
+  "onboarding_desc2": "Weekly selfies, charts, and streaks to visualize your transformation journey.",
+  "onboarding_title3": "AI-Powered Coaching",
+  "onboarding_desc3": "Get personalized workout, diet, and motivation suggestions powered by AI.",
+  "onboarding_getStarted": "Get Started",
+  "onboarding_next": "Next",
+  "onboarding_skip": "Skip",
+
+  "common_save": "Save",
+  "common_cancel": "Cancel",
+  "common_delete": "Delete",
+  "common_edit": "Edit",
+  "common_done": "Done",
+  "common_retry": "Retry",
+  "common_loading": "Loading...",
+  "common_error": "Something went wrong",
+  "common_offline": "You're offline. Changes will sync when connected.",
+  "common_noData": "No data available",
+  "common_today": "Today",
+  "common_yesterday": "Yesterday",
+  "common_thisWeek": "This Week",
+  "common_thisMonth": "This Month"
+}

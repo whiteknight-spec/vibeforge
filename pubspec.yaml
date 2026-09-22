@@ -1,0 +1,61 @@
+name: vibeforge
+description: "VibeForge - Personal Transformation Tracker. A futuristic habit & body transformation tracker with AI assistant."
+publish_to: 'none'
+version: 1.0.1+2
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  flutter_bloc: any
+  equatable: any
+
+  # Navigation
+  go_router: any
+
+  # Local Storage
+  hive: any
+  hive_flutter: any
+  flutter_secure_storage: any
+  path_provider: any
+
+  # Charts
+  fl_chart: any
+
+  # Animations
+  flutter_animate: any
+
+  # Media
+  image_picker: any
+
+  # UI
+  google_fonts: any
+  shimmer: any
+
+  # Utilities
+  intl: any
+  connectivity_plus: any
+  uuid: any
+
+  # Icons
+  cupertino_icons: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: any
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/
+    - assets/images/
+    - assets/animations/
