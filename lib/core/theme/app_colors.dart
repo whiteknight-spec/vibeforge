@@ -1,57 +1,57 @@
 import 'package:flutter/material.dart';
 
-/// VibeForge curated neon color palette.
+/// VibeForge Pro Designer Palette: Obsidian & Champagne Gold (Ultra-Luxury & High Performance).
 class AppColors {
   AppColors._();
 
-  // ── Dark Theme Base ───────────────────────────────────────────
-  static const Color backgroundDark = Color(0xFF0A0A0F);
-  static const Color surfaceDark = Color(0xFF141420);
-  static const Color surfaceAltDark = Color(0xFF1A1A2E);
-  static const Color surfaceElevatedDark = Color(0xFF22223A);
-  static const Color borderDark = Color(0xFF2A2A4A);
+  // ── Dark Theme Base (Deep Obsidian Carbon) ──────────────────────
+  static const Color backgroundDark = Color(0xFF0C0D10); // Deep Obsidian Matte
+  static const Color surfaceDark = Color(0xFF15171C);    // Charcoal Titanium Surface
+  static const Color surfaceAltDark = Color(0xFF1D2027); // Inner Card / Subtle Container
+  static const Color surfaceElevatedDark = Color(0xFF252932); // Raised Modal / Sheet
+  static const Color borderDark = Color(0xFF2E333E);     // Subtle Metallic Titanium Border
 
-  // ── Light Theme Base ──────────────────────────────────────────
-  static const Color backgroundLight = Color(0xFFF5F5FF);
+  // ── Light Theme Base (Porcelain Silk & Warm Sand) ───────────────
+  static const Color backgroundLight = Color(0xFFF8F9FA);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceAltLight = Color(0xFFF0F0FA);
-  static const Color borderLight = Color(0xFFD0D0E0);
+  static const Color surfaceAltLight = Color(0xFFF1F3F6);
+  static const Color borderLight = Color(0xFFE2E4E9);
 
-  // ── Primary: Neon Cyan ────────────────────────────────────────
-  static const Color primary = Color(0xFF00F5FF);
-  static const Color primaryDim = Color(0xFF00B8C4);
-  static const Color primaryGlow = Color(0x4000F5FF);
-  static const Color primarySurface = Color(0xFF0A2A2E);
+  // ── Primary: Radiant Champagne Gold ────────────────────────────
+  static const Color primary = Color(0xFFE5B869);       // Luminous Champagne Gold
+  static const Color primaryDim = Color(0xFFC89B48);    // Rich Burnished Gold
+  static const Color primaryGlow = Color(0x35E5B869);   // Soft Luxury Candlelight Halo
+  static const Color primarySurface = Color(0xFF282216); // Deep Gold Tinted Glass
 
-  // ── Secondary: Electric Purple ────────────────────────────────
-  static const Color secondary = Color(0xFF8B5CF6);
-  static const Color secondaryGlow = Color(0x408B5CF6);
+  // ── Secondary: Warm Cashmere Bronze & Silk ─────────────────────
+  static const Color secondary = Color(0xFFC4A482);     // Warm Cashmere Bronze
+  static const Color secondaryGlow = Color(0x30C4A482);
 
-  // ── Accent: Hot Pink ──────────────────────────────────────────
-  static const Color accent = Color(0xFFFF2D78);
-  static const Color accentGlow = Color(0x40FF2D78);
+  // ── Accent: Sunset Coral Ember ─────────────────────────────────
+  static const Color accent = Color(0xFFFF6B4A);        // Warm Sunset Ember
+  static const Color accentGlow = Color(0x35FF6B4A);
 
-  // ── Semantic Colors ───────────────────────────────────────────
-  static const Color success = Color(0xFF00FF88);
-  static const Color successSurface = Color(0xFF0A2A1A);
-  static const Color warning = Color(0xFFFFB800);
-  static const Color error = Color(0xFFFF4757);
-  static const Color errorSurface = Color(0xFF2A0A0E);
+  // ── Semantic Colors (Sophisticated & Clean) ────────────────────
+  static const Color success = Color(0xFF10B981);       // Refined Emerald Mint
+  static const Color successSurface = Color(0xFF0F291E);
+  static const Color warning = Color(0xFFF59E0B);       // Warm Sun Amber
+  static const Color error = Color(0xFFEF4444);         // Velvet Crimson
+  static const Color errorSurface = Color(0xFF2C1316);
 
-  // ── Text ──────────────────────────────────────────────────────
-  static const Color textPrimaryDark = Color(0xFFF0F0FF);
-  static const Color textSecondaryDark = Color(0xFF8888AA);
-  static const Color textTertiaryDark = Color(0xFF555570);
-  static const Color textPrimaryLight = Color(0xFF1A1A2E);
-  static const Color textSecondaryLight = Color(0xFF555570);
+  // ── Text Hierarchy (High-Contrast Porcelain & Silver Slate) ────
+  static const Color textPrimaryDark = Color(0xFFF8F9FA);  // Pure Porcelain White
+  static const Color textSecondaryDark = Color(0xFF9E9FA7);// Metallic Silver Slate
+  static const Color textTertiaryDark = Color(0xFF636672); // Subtle Titanium
+  static const Color textPrimaryLight = Color(0xFF121417);
+  static const Color textSecondaryLight = Color(0xFF5F6368);
 
-  // ── Streak ────────────────────────────────────────────────────
-  static const Color streakFire = Color(0xFFFF6B35);
-  static const Color streakGold = Color(0xFFFFD700);
+  // ── Streak (Warm Flame & Sun Ember) ───────────────────────────
+  static const Color streakFire = Color(0xFFFF5722);
+  static const Color streakGold = Color(0xFFFFC107);
 
   // ── Gradients ─────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primary, secondary],
+    colors: [Color(0xFFF3C77C), Color(0xFFC8963E)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -62,17 +62,24 @@ class AppColors {
     end: Alignment.topRight,
   );
 
-  static const List<Color> chartColors = [primary, secondary, accent, success, warning, streakFire];
+  static const List<Color> chartColors = [
+    primary,
+    Color(0xFF60A5FA), // Slate Sapphire
+    secondary,
+    success,
+    warning,
+    accent,
+  ];
 
   // ── Category Colors ───────────────────────────────────────────
   static Color categoryColor(String category) {
     switch (category) {
-      case 'lifestyle': return secondary;
-      case 'diet': return success;
-      case 'growth': return primary;
-      case 'fitness': return accent;
-      case 'health': return warning;
-      default: return const Color(0xFF6366F1);
+      case 'lifestyle': return const Color(0xFFA78BFA); // Royal Lavender
+      case 'diet': return success;                      // Emerald Mint
+      case 'growth': return primary;                    // Champagne Gold
+      case 'fitness': return accent;                    // Sunset Coral
+      case 'health': return const Color(0xFF38BDF8);    // Ice Sapphire
+      default: return secondary;
     }
   }
 }
