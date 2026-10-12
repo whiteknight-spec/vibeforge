@@ -2,10 +2,26 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
+
+  void _handleLogin(BuildContext context) {
+    try {
+      final box = Hive.box(AppConstants.hiveSettingsBox);
+      final completed = box.get('completed_onboarding', defaultValue: false) as bool;
+      if (!completed) {
+        context.go('/onboarding');
+      } else {
+        context.go('/home');
+      }
+    } catch (_) {
+      context.go('/home');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,12 +80,12 @@ class LoginPage extends StatelessWidget {
 
                   const Spacer(flex: 2),
 
-                  // Google Sign-In Button (simulated — navigates to home)
+                  // Google Sign-In Button
                   SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: () => context.go('/home'),
+                      onPressed: () => _handleLogin(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black87,
@@ -80,9 +96,15 @@ class LoginPage extends StatelessWidget {
                     ),
                   ).animate().fadeIn(duration: 500.ms, delay: 600.ms).slideY(begin: 0.2),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => _handleLogin(context),
+                    child: const Text('Continue as Guest', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                  ),
+
+                  const SizedBox(height: 12),
                   Text(
-                    'Your data stays private & encrypted',
+                    'Your data stays private & encrypted on device',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textTertiaryDark),
                   ).animate().fadeIn(delay: 800.ms),
 

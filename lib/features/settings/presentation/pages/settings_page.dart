@@ -4,9 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/neon_card.dart';
-import '../../../ai_assistant/domain/ai_agent_service.dart';
 import '../bloc/settings_bloc.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -138,18 +138,6 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
 
-              // Gemini API Key config
-              _SettingsTile(
-                icon: Icons.key_rounded,
-                iconColor: AppColors.streakGold,
-                title: 'Gemini API Key',
-                subtitle: state.isTamil
-                    ? 'பாதுகாப்பான சாவி கட்டமைப்பு'
-                    : 'Secure Keychain Configuration',
-                trailing: const Icon(Icons.chevron_right, size: 20, color: AppColors.textTertiaryDark),
-                onTap: () => _configureApiKey(context, state),
-              ),
-
               // Cloud backup toggle
               _SettingsTile(
                 icon: Icons.cloud_outlined,
@@ -161,6 +149,30 @@ class SettingsPage extends StatelessWidget {
                 trailing: Switch(
                   value: state.isCloudBackupEnabled,
                   onChanged: (_) => context.read<SettingsBloc>().add(const ToggleCloudBackup()),
+                ),
+              ),
+
+              // Transformation Photos tile
+              _SettingsTile(
+                icon: Icons.photo_library_outlined,
+                iconColor: AppColors.secondary,
+                title: state.isTamil ? 'மாற்ற காலவரிசை' : 'Transformation Photos',
+                subtitle: state.isTamil ? 'தினசரி முன்னேற்ற கேலரி' : 'Daily selfie progress gallery',
+                trailing: IconButton(
+                  icon: const Icon(Icons.chevron_right, size: 20, color: AppColors.textTertiaryDark),
+                  onPressed: () => context.push('/transformation'),
+                ),
+              ),
+
+              // App Walkthrough tile
+              _SettingsTile(
+                icon: Icons.explore_outlined,
+                iconColor: AppColors.primary,
+                title: state.isTamil ? 'அறிமுக சுற்றுலா' : 'App Walkthrough',
+                subtitle: state.isTamil ? 'அம்சங்களை மீண்டும் காண்க' : 'Revisit onboarding tour',
+                trailing: IconButton(
+                  icon: const Icon(Icons.chevron_right, size: 20, color: AppColors.textTertiaryDark),
+                  onPressed: () => context.push('/onboarding'),
                 ),
               ),
 
@@ -298,92 +310,6 @@ class SettingsPage extends StatelessWidget {
       }
     }
   }
-
-  void _configureApiKey(BuildContext context, SettingsState state) async {
-    final currentKey = await AiAgentService.resolveApiKey();
-    if (!context.mounted) return;
-
-    final controller = TextEditingController(text: currentKey ?? '');
-    bool obscure = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Gemini API Key',
-                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  if (currentKey != null && currentKey.isNotEmpty)
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                      label: Text(state.isTamil ? 'அகற்று' : 'Clear', style: const TextStyle(color: AppColors.error)),
-                      onPressed: () async {
-                        await AiAgentService.deleteApiKey();
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(state.isTamil ? 'API சாவி அகற்றப்பட்டது' : 'API key cleared'),
-                          ));
-                        }
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                state.isTamil
-                    ? 'உங்கள் சாவி சாதனத்தின் மறைகுறியாக்கப்பட்ட பாதுகாப்பான சேமிப்பகத்தில் சேமிக்கப்படும் (FlutterSecureStorage). மூலக் குறியீட்டில் ஒருபோதும் எழுதப்படாது.'
-                    : 'Your key is saved in your device\'s encrypted keychain via FlutterSecureStorage. Never committed or hardcoded in source code.',
-                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: AppColors.textTertiaryDark),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                obscureText: obscure,
-                decoration: InputDecoration(
-                  hintText: 'AIzaSy...',
-                  prefixIcon: const Icon(Icons.key_rounded, color: AppColors.streakGold),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setModalState(() => obscure = !obscure),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final key = controller.text.trim();
-                    if (key.isNotEmpty) {
-                      await AiAgentService.saveApiKey(key);
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(state.isTamil ? 'API சாவி பாதுகாப்பாக சேமிக்கப்பட்டது' : 'API Key saved securely'),
-                        ));
-                      }
-                    }
-                  },
-                  child: Text(state.isTamil ? 'சேமி' : 'Save Securely'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -404,14 +330,12 @@ class _SettingsTile extends StatelessWidget {
   final Color iconColor;
   final String title, subtitle;
   final Widget trailing;
-  final VoidCallback? onTap;
   const _SettingsTile({
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.trailing,
-    this.onTap,
   });
 
   @override
@@ -420,7 +344,6 @@ class _SettingsTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: NeonCard(
         margin: EdgeInsets.zero,
-        onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [

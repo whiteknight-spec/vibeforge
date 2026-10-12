@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'features/checklist/presentation/bloc/checklist_bloc.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
+import 'l10n/app_localizations.dart';
 import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load .env
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (_) {
+    // Graceful fallback if .env not yet populated
+  }
 
   // Initialize Hive
   await Hive.initFlutter();
@@ -19,6 +28,7 @@ void main() async {
   await Hive.openBox(AppConstants.hiveAnalyticsBox);
   await Hive.openBox(AppConstants.hiveUserBox);
   await Hive.openBox(AppConstants.hiveProgressPhotosBox);
+  await Hive.openBox(AppConstants.hiveAiChatBox);
 
   runApp(const VibeForgeApp());
 }
@@ -43,7 +53,8 @@ class VibeForgeApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: settingsState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             locale: Locale(settingsState.languageCode),
-            supportedLocales: const [Locale('en'), Locale('ta')],
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             routerConfig: AppRouter.router,
           );
         },

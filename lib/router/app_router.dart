@@ -9,6 +9,8 @@ import '../features/auth/presentation/pages/login_page.dart';
 import '../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../features/recap/presentation/pages/weekly_recap_page.dart';
 import '../features/transformation/presentation/pages/transformation_timeline_page.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../core/constants/app_constants.dart';
 import 'shell_page.dart';
 
 /// App router with go_router for declarative navigation.
@@ -16,9 +18,19 @@ class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+  static String get _initialLocation {
+    try {
+      final box = Hive.box(AppConstants.hiveSettingsBox);
+      final completed = box.get('completed_onboarding', defaultValue: false) as bool;
+      return completed ? '/home' : '/onboarding';
+    } catch (_) {
+      return '/home';
+    }
+  }
+
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: _initialLocation,
     routes: [
       // Login
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),

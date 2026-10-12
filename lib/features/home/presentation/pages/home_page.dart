@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/greeting_utils.dart';
 import '../../../../core/widgets/neon_card.dart';
@@ -180,7 +182,13 @@ class HomePage extends StatelessWidget {
                               icon: Icons.replay_rounded,
                               label: settings.isTamil ? 'வாராந்திர சுருக்கம்' : 'Weekly Recap',
                               color: AppColors.streakFire,
-                              onTap: () => context.go('/recap'),
+                              onTap: () => context.push('/recap'),
+                            ),
+                            _QuickActionCard(
+                              icon: Icons.camera_alt_rounded,
+                              label: settings.isTamil ? 'புகைப்பட காலவரிசை' : 'Photo Timeline',
+                              color: AppColors.primary,
+                              onTap: () => context.push('/transformation'),
                             ),
                           ].animate(interval: 80.ms).fadeIn(duration: 400.ms).slideX(begin: 0.2),
                         ),
@@ -220,6 +228,68 @@ class HomePage extends StatelessWidget {
                           ),
                         ),
                       ).animate().fadeIn(duration: 500.ms, delay: 500.ms),
+                    ),
+
+                    // ── Transformation Photo Banner ────────────────
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: ValueListenableBuilder(
+                          valueListenable: Hive.box(AppConstants.hiveProgressPhotosBox).listenable(),
+                          builder: (context, Box box, _) {
+                            final photos = box.get('photos', defaultValue: []) as List;
+                            final now = DateTime.now();
+                            final todayKey = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+                            final hasTodayPhoto = photos.any((p) => p is Map && p['dateKey'] == todayKey);
+
+                            return NeonCard(
+                              showGlow: true,
+                              glowColor: hasTodayPhoto ? AppColors.success : AppColors.primary,
+                              glowIntensity: 0.25,
+                              onTap: () => context.push('/transformation'),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: (hasTodayPhoto ? AppColors.success : AppColors.primary).withAlpha(30),
+                                    ),
+                                    child: Icon(
+                                      hasTodayPhoto ? Icons.check_circle_outline : Icons.add_a_photo_outlined,
+                                      color: hasTodayPhoto ? AppColors.success : AppColors.primary,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          settings.isTamil
+                                              ? (hasTodayPhoto ? 'இன்றைய செல்ஃபி பதிவு செய்யப்பட்டது!' : 'தினசரி செல்ஃபி பதிவேற்றவும்')
+                                              : (hasTodayPhoto ? 'Today\'s Selfie Recorded!' : 'Log Daily Progress Selfie'),
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          settings.isTamil
+                                              ? '${photos.length} புகைப்படங்கள் சேமிக்கப்பட்டுள்ளன'
+                                              : '${photos.length} transformation photos captured',
+                                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textTertiaryDark),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: AppColors.textTertiaryDark),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ).animate().fadeIn(duration: 500.ms, delay: 550.ms),
                     ),
 
                     // ── Incomplete Tasks Preview ───────────────────

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class OnboardingPage extends StatefulWidget {
@@ -13,6 +15,14 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final _pageController = PageController();
   int _currentPage = 0;
+
+  void _finishOnboarding() {
+    try {
+      final box = Hive.box(AppConstants.hiveSettingsBox);
+      box.put('completed_onboarding', true);
+    } catch (_) {}
+    context.go('/home');
+  }
 
   static const _pages = [
     _OnboardingData(
@@ -51,7 +61,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => context.go('/home'),
+                onPressed: _finishOnboarding,
                 child: const Text('Skip'),
               ),
             ),
@@ -120,7 +130,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       if (_currentPage < _pages.length - 1) {
                         _pageController.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
                       } else {
-                        context.go('/home');
+                        _finishOnboarding();
                       }
                     },
                     style: ElevatedButton.styleFrom(

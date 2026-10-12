@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -59,6 +60,14 @@ class _WeeklyRecapPageState extends State<WeeklyRecapPage> {
     return names[weekday - 1];
   }
 
+  void _closeRecap() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<SettingsBloc, SettingsState>(
@@ -72,7 +81,7 @@ class _WeeklyRecapPageState extends State<WeeklyRecapPage> {
                 if (_currentSlide < _slides.length - 1) {
                   _pageController.nextPage(duration: 300.ms, curve: Curves.easeOut);
                 } else {
-                  Navigator.pop(context);
+                  _closeRecap();
                 }
               } else {
                 if (_currentSlide > 0) {
@@ -120,7 +129,7 @@ class _WeeklyRecapPageState extends State<WeeklyRecapPage> {
                   right: 12,
                   child: IconButton(
                     icon: const Icon(Icons.close, color: Colors.white, size: 24),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _closeRecap,
                   ),
                 ),
               ],

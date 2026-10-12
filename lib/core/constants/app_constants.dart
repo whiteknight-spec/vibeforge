@@ -27,6 +27,7 @@ class AppConstants {
   static const String hiveUserBox = 'user_box';
   static const String hiveAnalyticsBox = 'analytics_box';
   static const String hiveProgressPhotosBox = 'progress_photos_box';
+  static const String hiveAiChatBox = 'ai_chat_box';
 
   // Animation durations
   static const Duration animFast = Duration(milliseconds: 200);

@@ -280,9 +280,32 @@ void main() {
 
     test('AI Agent processMessage guides user when Gemini API key is not configured', () async {
       final response = await aiAgent.processMessage('Add 10 pullups to my list');
-      expect(response.message, contains('Gemini API Key Required'));
-      expect(response.message, contains('--dart-define=GEMINI_API_KEY'));
-      expect(response.message, contains('Settings Page'));
+      expect(response.message, contains('Gemini API Key'));
+      expect(response.message, contains('.env'));
+      expect(response.message, contains('GEMINI_API_KEY'));
+    });
+
+    test('AI Agent tool: batchCreateHabits adds multiple habits', () {
+      final result = aiAgent.batchCreateHabits(
+        tasks: ['Morning Pushups', 'Read 10 Pages', 'Evening Meditation'],
+        category: 'growth',
+      );
+      expect(result.success, true);
+      expect(result.data['tasks'].length, 3);
+    });
+
+    test('AI Agent tool: updateChecklistItem updates existing item', () async {
+      // First create
+      final createRes = aiAgent.createChecklistItem(title: 'Old Habit');
+      expect(createRes.success, true);
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      final item = checklistBloc.state.items.firstWhere((i) => i.title == 'Old Habit');
+
+      // Update
+      final updateRes = aiAgent.updateChecklistItem(itemId: item.id, newTitle: 'Updated Habit', newIcon: '🔥');
+      expect(updateRes.success, true);
+      expect(updateRes.data['title'], 'Updated Habit');
     });
   });
 }

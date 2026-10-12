@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../checklist/presentation/bloc/checklist_bloc.dart';
+import '../../checklist/domain/entities/checklist_item.dart';
 import '../../analytics/presentation/bloc/analytics_bloc.dart';
 import '../../settings/presentation/bloc/settings_bloc.dart';
 
@@ -56,9 +58,19 @@ class AiAgentService {
 
   /// Securely resolves the Gemini API key.
   /// Priority:
-  /// 1. Compile-time environment variable: --dart-define=GEMINI_API_KEY=...
-  /// 2. Encrypted local storage (FlutterSecureStorage under 'GEMINI_API_KEY')
+  /// 1. .env file via flutter_dotenv (e.g. GEMINI_API_KEY=...)
+  /// 2. Compile-time environment variable: --dart-define=GEMINI_API_KEY=...
+  /// 3. Encrypted local storage fallback (FlutterSecureStorage under 'GEMINI_API_KEY')
   static Future<String?> resolveApiKey() async {
+    try {
+      final fromDotenv = dotenv.env['GEMINI_API_KEY'];
+      if (fromDotenv != null && fromDotenv.trim().isNotEmpty) {
+        return fromDotenv.trim();
+      }
+    } catch (_) {
+      // Dotenv fallback
+    }
+
     const fromEnv = String.fromEnvironment('GEMINI_API_KEY');
     if (fromEnv.isNotEmpty) return fromEnv;
 
@@ -172,11 +184,13 @@ class AiAgentService {
       final afterCount = checklistBloc.state.items.length;
       final verified = afterCount >= initialCount;
 
+      final createdItem = checklistBloc.state.items.where((i) => i.title == trimmed).lastOrNull;
+
       return ToolResult(
         toolName: 'createChecklistItem',
         success: verified,
         message: verified ? 'Created task: "$trimmed"' : 'Failed to confirm task creation in state',
-        data: {'title': trimmed, 'icon': icon, 'category': category},
+        data: {'id': createdItem?.id, 'title': trimmed, 'icon': icon, 'category': category},
       );
     } catch (e) {
       return ToolResult(toolName: 'createChecklistItem', success: false, message: 'Failed to create item: $e');
@@ -352,6 +366,78 @@ class AiAgentService {
     }
   }
 
+  /// Tool 10: Batch create habits (Routine/Workout plan)
+  ToolResult batchCreateHabits({
+    required List<String> tasks,
+    String category = 'custom',
+  }) {
+    try {
+      final validTasks = tasks.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+      if (validTasks.isEmpty) {
+        return const ToolResult(
+          toolName: 'batchCreateHabits',
+          success: false,
+          message: 'No valid task titles provided.',
+        );
+      }
+      for (final task in validTasks) {
+        checklistBloc.add(AddCustomItem(
+          title: task,
+          titleTa: task,
+          category: category,
+          icon: '✨',
+        ));
+      }
+      return ToolResult(
+        toolName: 'batchCreateHabits',
+        success: true,
+        message: 'Successfully created ${validTasks.length} habits: ${validTasks.join(", ")}',
+        data: {'tasks': validTasks, 'category': category},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'batchCreateHabits', success: false, message: 'Failed to batch create habits: $e');
+    }
+  }
+
+  /// Tool 11: Update an existing custom habit item
+  ToolResult updateChecklistItem({
+    required String itemId,
+    required String newTitle,
+    String? newIcon,
+  }) {
+    try {
+      final state = checklistBloc.state;
+      ChecklistItem? target;
+      for (final i in state.items) {
+        if (i.id == itemId || i.title.toLowerCase() == itemId.toLowerCase()) {
+          target = i;
+          break;
+        }
+      }
+      if (target == null) {
+        return ToolResult(
+          toolName: 'updateChecklistItem',
+          success: false,
+          message: 'Item "$itemId" not found in checklist.',
+        );
+      }
+      checklistBloc.add(UpdateCustomItem(
+        itemId: target.id,
+        title: newTitle,
+        titleTa: newTitle,
+        icon: newIcon,
+      ));
+      return ToolResult(
+        toolName: 'updateChecklistItem',
+        success: true,
+        message: 'Updated habit "${target.title}" to "$newTitle"',
+        data: {'itemId': target.id, 'title': newTitle},
+      );
+    } catch (e) {
+      return ToolResult(toolName: 'updateChecklistItem', success: false, message: 'Failed to update habit: $e');
+    }
+  }
+
   // ── GEMINI TOOL DECLARATIONS ──────────────────────────────────
 
   static final List<Map<String, dynamic>> _geminiFunctionDeclarations = [
@@ -462,33 +548,75 @@ class AiAgentService {
         'properties': <String, dynamic>{},
       },
     },
+    {
+      'name': 'batchCreateHabits',
+      'description': 'Add multiple habits or an entire routine plan at once to the user\'s daily checklist.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'tasks': {
+            'type': 'ARRAY',
+            'description': 'List of habit titles to add',
+            'items': {'type': 'STRING'},
+          },
+          'category': {
+            'type': 'STRING',
+            'description': 'Category of tasks (fitness, diet, growth, lifestyle, custom)',
+          },
+        },
+        'required': ['tasks'],
+      },
+    },
+    {
+      'name': 'updateChecklistItem',
+      'description': 'Update an existing habit\'s title or icon.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'itemId': {
+            'type': 'STRING',
+            'description': 'ID of the item to update',
+          },
+          'newTitle': {
+            'type': 'STRING',
+            'description': 'The new updated title for the habit',
+          },
+          'newIcon': {
+            'type': 'STRING',
+            'description': 'Emoji icon for the habit',
+          },
+        },
+        'required': ['itemId', 'newTitle'],
+      },
+    },
   ];
 
   // ── GEMINI LLM INTERACTION ─────────────────────────────────────
 
   /// Process user message through Gemini with controlled tool calling.
   /// Executes actions on Hive and verifies results before completing.
-  Future<AiAgentResponse> processMessage(String userInput) async {
+  Future<AiAgentResponse> processMessage(
+    String userInput, {
+    List<Map<String, String>> chatHistory = const [],
+  }) async {
     final apiKey = await resolveApiKey();
     final isTamil = settingsBloc.state.isTamil;
 
     if (apiKey == null || apiKey.isEmpty) {
       return AiAgentResponse(
         message: isTamil
-            ? '⚠️ **Gemini API Key தேவைப்படுகிறது**\n\n'
-              'Gemini AI பயிற்சியாளரை இயக்க, API Key-ஐ வழங்கவும்:\n\n'
-              '1. **Compile parameter** (பரிந்துரைக்கப்படுகிறது):\n'
-              '   `flutter run --dart-define=GEMINI_API_KEY=YOUR_KEY`\n\n'
-              '2. **அமைப்புகள் பக்கம்**:\n'
-              '   Settings > Features > Gemini API Key-ல் உள்ளிடவும் (மறைகுறியாக்கப்பட்ட பாதுகாப்பான சேமிப்பகம்).\n\n'
-              '*(பாதுகாப்பு விதிகளின்படி, API சாவிகள் மூலக் குறியீட்டில் எழுதப்படாது.)*'
+            ? '⚠️ **Gemini API Key அமைக்கப்படவில்லை**\n\n'
+              'தன்னியக்க AI பயிற்சியாளரை இயக்க, `.env` கோப்பில் API Key-ஐ வழங்கவும்:\n\n'
+              '```env\n'
+              'GEMINI_API_KEY=AIzaSy...\n'
+              '```\n\n'
+              '*(இலவச API சாவியை [Google AI Studio](https://aistudio.google.com/app/apikey) தளத்தில் பெறலாம்.)*'
             : '⚠️ **Gemini API Key Required**\n\n'
-              'To enable the Gemini AI Coach, please provide your Gemini API key via either:\n\n'
-              '1. **Compile/Run parameter** (Recommended for development):\n'
-              '   `flutter run --dart-define=GEMINI_API_KEY=YOUR_KEY`\n\n'
-              '2. **Settings Page**:\n'
-              '   Navigate to Settings > Features > Gemini API Key to save securely in encrypted keychain.\n\n'
-              '*(In compliance with security standards, API credentials are never hardcoded into source code.)*',
+              'To activate the autonomous AI agent, please add your Gemini API key to the `.env` file:\n\n'
+              '```env\n'
+              'GEMINI_API_KEY=AIzaSy...\n'
+              '```\n\n'
+              '*(You can obtain a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey).)*',
         toolSteps: [],
         results: [],
       );
@@ -499,24 +627,34 @@ class AiAgentService {
 
     // Build system instruction
     final systemPrompt =
-        'You are VibeForge AI Coach, a supportive fitness and habit transformation coach.\n'
-        'You have access to real tools that directly interact with the user\'s local Hive data.\n'
-        'When the user requests adding tasks, logging measurements, toggling items, or viewing stats, '
-        'you MUST call the corresponding tool/function.\n'
-        'Do NOT pretend or hallucinate completing an action without calling the tool.\n'
-        'Never claim an action succeeded unless verified by the tool execution result.\n'
-        'Always maintain an encouraging and energizing tone.\n'
+        'You are VibeForge Autonomous Agent, a proactive fitness, health & habit transformation coach.\n'
+        'You have full autonomy and direct access to local Hive database tools.\n'
+        'When the user asks you to add habits, generate workout or diet routines, toggle status, check streaks, or log weight/waist, '
+        'you MUST proactively execute the appropriate tools.\n'
+        'You can execute multiple tools in sequence (e.g. inspect checklist first, then create missing tasks).\n'
+        'Never pretend to execute an action without calling the tool.\n'
+        'Only confirm actions that succeeded via tool execution results.\n'
+        'Maintain an energetic, motivating, and disciplined coach persona.\n'
         'Respond in ${isTamil ? 'Tamil' : 'English'}.';
 
-    // Initialize conversation contents
-    final contents = <Map<String, dynamic>>[
-      {
-        'role': 'user',
-        'parts': [
-          {'text': userInput},
-        ],
-      },
-    ];
+    // Initialize conversation contents with recent history for true multi-turn context
+    final contents = <Map<String, dynamic>>[];
+    for (final h in chatHistory.take(8)) {
+      final role = h['role'] ?? 'user';
+      final text = h['content'] ?? '';
+      if (text.isNotEmpty) {
+        contents.add({
+          'role': role == 'user' ? 'user' : 'model',
+          'parts': [{'text': text}],
+        });
+      }
+    }
+
+    // Append current user message
+    contents.add({
+      'role': 'user',
+      'parts': [{'text': userInput}],
+    });
 
     // Tool execution loop (up to 5 rounds)
     for (int round = 0; round < 5; round++) {
@@ -675,6 +813,18 @@ class AiAgentService {
       case 'getProgressPhotos':
         return getProgressPhotos();
 
+      case 'batchCreateHabits':
+        final rawTasks = args['tasks'];
+        final tasks = rawTasks is List ? rawTasks.map((e) => e.toString()).toList() : <String>[];
+        final category = args['category']?.toString() ?? 'custom';
+        return batchCreateHabits(tasks: tasks, category: category);
+
+      case 'updateChecklistItem':
+        final itemId = args['itemId']?.toString() ?? '';
+        final newTitle = args['newTitle']?.toString() ?? '';
+        final newIcon = args['newIcon']?.toString();
+        return updateChecklistItem(itemId: itemId, newTitle: newTitle, newIcon: newIcon);
+
       default:
         return ToolResult(
           toolName: name,
@@ -684,40 +834,56 @@ class AiAgentService {
     }
   }
 
-  /// Native HTTP client execution for Gemini REST API
+  /// Native HTTP client execution for Gemini REST API with resilient retry for transient 503/429 errors
   Future<Map<String, dynamic>> _callGeminiApi({
     required String apiKey,
     required Map<String, dynamic> body,
   }) async {
-    final client = HttpClient();
-    try {
-      final uri = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey',
-      );
-      final request = await client.postUrl(uri);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
-      request.write(jsonEncode(body));
+    int attempts = 0;
+    while (attempts < 3) {
+      attempts++;
+      final client = HttpClient();
+      try {
+        final uri = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey',
+        );
+        final request = await client.postUrl(uri);
+        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+        request.write(jsonEncode(body));
 
-      final response = await request.close().timeout(const Duration(seconds: 25));
-      final responseBody = await response.transform(utf8.decoder).join();
+        final response = await request.close().timeout(const Duration(seconds: 25));
+        final responseBody = await response.transform(utf8.decoder).join();
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(responseBody) as Map<String, dynamic>;
-      } else {
-        try {
-          final errorJson = jsonDecode(responseBody);
-          return {'error': errorJson['error'] ?? {'message': 'HTTP ${response.statusCode}: $responseBody'}};
-        } catch (_) {
-          return {'error': {'message': 'HTTP ${response.statusCode}: $responseBody'}};
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return jsonDecode(responseBody) as Map<String, dynamic>;
+        } else if ((response.statusCode == 503 || response.statusCode == 429) && attempts < 3) {
+          await Future.delayed(Duration(milliseconds: 1200 * attempts));
+          continue;
+        } else {
+          try {
+            final errorJson = jsonDecode(responseBody);
+            return {'error': errorJson['error'] ?? {'message': 'HTTP ${response.statusCode}: $responseBody'}};
+          } catch (_) {
+            return {'error': {'message': 'HTTP ${response.statusCode}: $responseBody'}};
+          }
         }
+      } on TimeoutException {
+        if (attempts < 3) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+          continue;
+        }
+        return {'error': {'message': 'Gemini API request timed out (25s).'}};
+      } catch (e) {
+        if (attempts < 3) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+          continue;
+        }
+        return {'error': {'message': 'Connection error: $e'}};
+      } finally {
+        client.close();
       }
-    } on TimeoutException {
-      return {'error': {'message': 'Gemini API request timed out (25s).'}};
-    } catch (e) {
-      return {'error': {'message': 'Connection error: $e'}};
-    } finally {
-      client.close();
     }
+    return {'error': {'message': 'Gemini API failed after multiple retries'}};
   }
 }
 

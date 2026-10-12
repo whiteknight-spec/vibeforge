@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/neon_card.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
@@ -377,13 +378,24 @@ class _BodyTab extends StatelessWidget {
           ],
 
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _showAddMeasurement(context, settings),
-              icon: const Icon(Icons.add),
-              label: Text(settings.isTamil ? 'அளவீடு சேர்' : 'Add Measurement'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showAddMeasurement(context, settings),
+                  icon: const Icon(Icons.add),
+                  label: Text(settings.isTamil ? 'அளவீடு சேர்' : 'Add Measurement'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/transformation'),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: Text(settings.isTamil ? 'புகைப்படங்கள்' : 'Photos'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 80),
         ],
