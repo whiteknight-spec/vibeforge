@@ -1,0 +1,19 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "pubspec.yaml": "pubspec.lock, l10n.yaml, analysis_options.yaml",
+    ".env.example": ".env",
+    "README.md": ".metadata"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/.dart_tool": true,
+    "**/.flutter-plugins-dependencies": true,
+    "**/*.iml": true,
+    "**/.idea": true
+  },
+  "dart.flutterHotReloadOnSave": "all",
+  "editor.formatOnSave": true
+}
