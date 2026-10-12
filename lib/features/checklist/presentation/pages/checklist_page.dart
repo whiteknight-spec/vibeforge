@@ -281,60 +281,68 @@ class ChecklistPage extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(settings.isTamil ? 'புதிய உருப்படி' : 'New Item',
-              style: Theme.of(ctx).textTheme.headlineSmall),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(labelText: settings.isTamil ? 'பெயர் (ஆங்கிலம்)' : 'Title (English)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: titleTaController,
-              decoration: InputDecoration(labelText: settings.isTamil ? 'பெயர் (தமிழ்)' : 'Title (Tamil)'),
-            ),
-            const SizedBox(height: 16),
-            Text(settings.isTamil ? 'ஐகான்' : 'Icon', style: Theme.of(ctx).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: icons.map((e) => GestureDetector(
-                onTap: () { selectedIcon = e; },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderDark),
-                  ),
-                  child: Text(e, style: const TextStyle(fontSize: 20)),
-                ),
-              )).toList(),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (titleController.text.isNotEmpty) {
-                    context.read<ChecklistBloc>().add(AddCustomItem(
-                      title: titleController.text,
-                      titleTa: titleTaController.text.isNotEmpty ? titleTaController.text : titleController.text,
-                      icon: selectedIcon,
-                      category: selectedCategory,
-                    ));
-                    Navigator.pop(ctx);
-                  }
-                },
-                child: Text(settings.isTamil ? 'சேர்' : 'Add'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(settings.isTamil ? 'புதிய உருப்படி' : 'New Item',
+                style: Theme.of(ctx).textTheme.headlineSmall),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(labelText: settings.isTamil ? 'பெயர் (ஆங்கிலம்)' : 'Title (English)'),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: titleTaController,
+                decoration: InputDecoration(labelText: settings.isTamil ? 'பெயர் (தமிழ்)' : 'Title (Tamil)'),
+              ),
+              const SizedBox(height: 16),
+              Text(settings.isTamil ? 'ஐகான்' : 'Icon', style: Theme.of(ctx).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: icons.map((e) => GestureDetector(
+                  onTap: () => setSheetState(() => selectedIcon = e),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: selectedIcon == e ? AppColors.primary : AppColors.borderDark,
+                        width: selectedIcon == e ? 2 : 1,
+                      ),
+                      color: selectedIcon == e ? AppColors.primary.withAlpha(35) : null,
+                    ),
+                    child: Text(e, style: const TextStyle(fontSize: 20)),
+                  ),
+                )).toList(),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final trimmed = titleController.text.trim();
+                    if (trimmed.isNotEmpty) {
+                      final trimmedTa = titleTaController.text.trim();
+                      context.read<ChecklistBloc>().add(AddCustomItem(
+                        title: trimmed,
+                        titleTa: trimmedTa.isNotEmpty ? trimmedTa : trimmed,
+                        icon: selectedIcon,
+                        category: selectedCategory,
+                      ));
+                      Navigator.pop(ctx);
+                    }
+                  },
+                  child: Text(settings.isTamil ? 'சேர்' : 'Add'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

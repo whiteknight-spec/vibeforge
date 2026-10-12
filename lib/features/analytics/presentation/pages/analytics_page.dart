@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -316,38 +317,64 @@ class _BodyTab extends StatelessWidget {
             ).animate().fadeIn(duration: 400.ms)
           else ...[
             // Weight chart if data exists
-            NeonCard(
-              child: SizedBox(
-                height: 200,
-                child: LineChart(
-                  LineChartData(
-                    gridData: FlGridData(show: true, drawVerticalLine: false,
-                      getDrawingHorizontalLine: (v) => FlLine(color: AppColors.borderDark.withAlpha(51), strokeWidth: 1)),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40,
-                        getTitlesWidget: (v, _) => Text('${v.round()}', style: const TextStyle(fontSize: 10, color: AppColors.textTertiaryDark)))),
-                      bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      if (state.measurements.any((m) => m.weight != null))
-                        LineChartBarData(
-                          spots: state.measurements.where((m) => m.weight != null)
-                              .toList().asMap().entries
-                              .map((e) => FlSpot(e.key.toDouble(), e.value.weight!)).toList(),
-                          isCurved: true, color: AppColors.accent, barWidth: 3,
-                          shadow: Shadow(color: AppColors.accent.withAlpha(102), blurRadius: 10),
-                          belowBarData: BarAreaData(show: true,
-                            gradient: LinearGradient(colors: [AppColors.accent.withAlpha(51), AppColors.accent.withAlpha(0)],
-                              begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+            Builder(
+              builder: (context) {
+                final weightSpots = state.measurements
+                    .where((m) => m.weight != null)
+                    .toList()
+                    .asMap()
+                    .entries
+                    .map((e) => FlSpot(e.key.toDouble(), e.value.weight!))
+                    .toList();
+
+                final minY = weightSpots.isNotEmpty
+                    ? (weightSpots.map((s) => s.y).reduce(min) - 5).clamp(0.0, 500.0)
+                    : 0.0;
+                final maxY = weightSpots.isNotEmpty
+                    ? (weightSpots.map((s) => s.y).reduce(max) + 5)
+                    : 100.0;
+                final maxX = weightSpots.length > 1
+                    ? (weightSpots.length - 1).toDouble()
+                    : 1.0;
+
+                return NeonCard(
+                  child: SizedBox(
+                    height: 200,
+                    child: LineChart(
+                      LineChartData(
+                        minX: 0,
+                        maxX: maxX,
+                        minY: minY,
+                        maxY: maxY,
+                        gridData: FlGridData(show: true, drawVerticalLine: false,
+                          getDrawingHorizontalLine: (v) => FlLine(color: AppColors.borderDark.withAlpha(51), strokeWidth: 1)),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40,
+                            getTitlesWidget: (v, _) => Text('${v.round()}', style: const TextStyle(fontSize: 10, color: AppColors.textTertiaryDark)))),
+                          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
-                    ],
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          if (weightSpots.isNotEmpty)
+                            LineChartBarData(
+                              spots: weightSpots,
+                              isCurved: weightSpots.length > 1,
+                              color: AppColors.accent,
+                              barWidth: 3,
+                              shadow: Shadow(color: AppColors.accent.withAlpha(102), blurRadius: 10),
+                              belowBarData: BarAreaData(show: true,
+                                gradient: LinearGradient(colors: [AppColors.accent.withAlpha(51), AppColors.accent.withAlpha(0)],
+                                  begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ).animate().fadeIn(duration: 500.ms),
+                ).animate().fadeIn(duration: 500.ms);
+              },
+            ),
 
             // Measurement list
             const SizedBox(height: 16),

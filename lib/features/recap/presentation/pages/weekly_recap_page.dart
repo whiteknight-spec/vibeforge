@@ -26,6 +26,12 @@ class _WeeklyRecapPageState extends State<WeeklyRecapPage> {
     _slides = _buildSlides();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   List<_RecapSlide> _buildSlides() {
     final dailyLogBox = Hive.box(AppConstants.hiveDailyLogBox);
     final now = DateTime.now();

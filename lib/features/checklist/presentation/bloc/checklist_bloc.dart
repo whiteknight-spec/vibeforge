@@ -287,8 +287,11 @@ class ChecklistBloc extends Bloc<ChecklistEvent, ChecklistState> {
 
   Future<void> _onReorder(ReorderItems event, Emitter<ChecklistState> emit) async {
     final items = List<ChecklistItem>.from(state.items);
+    if (event.oldIndex < 0 || event.oldIndex >= items.length) return;
     var newIdx = event.newIndex;
     if (newIdx > event.oldIndex) newIdx--;
+    if (newIdx < 0 || newIdx >= items.length) return;
+
     final item = items.removeAt(event.oldIndex);
     items.insert(newIdx, item);
 
@@ -338,22 +341,18 @@ class ChecklistBloc extends Bloc<ChecklistEvent, ChecklistState> {
     int streak = 0;
     var date = DateTime.now();
 
-    // Check if today is complete - if not, start from yesterday
+    // Check if today is completed
     final todayData = _dailyLogBox.get(todayKey);
-    if (todayData != null && todayData is List) {
+    if (todayData != null && todayData is List && todayData.isNotEmpty) {
       final allDone = todayData.every((m) => m['isCompleted'] == true);
-      if (allDone && todayData.isNotEmpty) {
+      if (allDone) {
         streak = 1;
-      } else {
-        date = date.subtract(const Duration(days: 1));
       }
-    } else {
-      date = date.subtract(const Duration(days: 1));
     }
 
-    // Count backwards
+    // Check backwards starting from yesterday
+    date = date.subtract(const Duration(days: 1));
     for (int i = 0; i < 365; i++) {
-      if (streak == 0 && i == 0) { date = date.subtract(const Duration(days: 1)); continue; }
       final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       final data = _dailyLogBox.get(key);
       if (data != null && data is List && data.isNotEmpty && data.every((m) => m['isCompleted'] == true)) {

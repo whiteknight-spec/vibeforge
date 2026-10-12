@@ -137,6 +137,47 @@ void main() {
 
       expect(analyticsBloc.state.measurements.isEmpty, true);
     });
+
+    test('Adding measurement twice on the same day updates in-place without duplicating', () async {
+      analyticsBloc.add(const LoadAnalytics());
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      analyticsBloc.add(const AddMeasurement(weight: 70.0, waist: 80.0));
+      await Future.delayed(const Duration(milliseconds: 100));
+      expect(analyticsBloc.state.measurements.length, 1);
+
+      // Add again on same day
+      analyticsBloc.add(const AddMeasurement(weight: 69.5));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      expect(analyticsBloc.state.measurements.length, 1);
+      expect(analyticsBloc.state.measurements.first.weight, 69.5);
+      expect(analyticsBloc.state.measurements.first.waist, 80.0);
+    });
+  });
+
+  group('Senior QA: Streak Algorithm Correctness Tests', () {
+    test('Streak preserves 1 day when yesterday was complete and today is in-progress', () async {
+      final now = DateTime.now();
+      final yesterday = now.subtract(const Duration(days: 1));
+      final yesterdayKey = '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+      final todayKey = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // Seed yesterday as 100% completed in Hive
+      final dailyBox = Hive.box(AppConstants.hiveDailyLogBox);
+      await dailyBox.put(yesterdayKey, [
+        {'id': '1', 'title': 'Task', 'isCompleted': true},
+      ]);
+      // Today is incomplete
+      await dailyBox.put(todayKey, [
+        {'id': '1', 'title': 'Task', 'isCompleted': false},
+      ]);
+
+      checklistBloc.add(LoadChecklist(dateKey: todayKey));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      expect(checklistBloc.state.streakCount, 1);
+    });
   });
 
   group('Change 4: Profile Picture Storage Tests', () {

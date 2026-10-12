@@ -163,15 +163,45 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     final id = 'meas_${now.millisecondsSinceEpoch}';
 
     final measList = _analyticsBox.get('measurements', defaultValue: []) as List;
-    measList.add({'id': id, 'dateKey': key, 'weight': event.weight, 'waist': event.waist});
-    await _analyticsBox.put('measurements', measList);
+    final existingIdx = measList.indexWhere((m) => m is Map && m['dateKey'] == key);
 
-    final newMeasurement = MeasurementData(id: id, dateKey: key, weight: event.weight, waist: event.waist);
-    emit(AnalyticsState(
-      dailyData: state.dailyData,
-      measurements: [...state.measurements, newMeasurement],
-      isLoading: false,
-    ));
+    if (existingIdx >= 0) {
+      final existing = Map<String, dynamic>.from(measList[existingIdx] as Map);
+      measList[existingIdx] = {
+        ...existing,
+        if (event.weight != null) 'weight': event.weight,
+        if (event.waist != null) 'waist': event.waist,
+      };
+      await _analyticsBox.put('measurements', measList);
+
+      final updated = state.measurements.map((m) {
+        if (m.dateKey == key) {
+          return MeasurementData(
+            id: m.id,
+            dateKey: key,
+            weight: event.weight ?? m.weight,
+            waist: event.waist ?? m.waist,
+          );
+        }
+        return m;
+      }).toList();
+
+      emit(AnalyticsState(
+        dailyData: state.dailyData,
+        measurements: updated,
+        isLoading: false,
+      ));
+    } else {
+      measList.add({'id': id, 'dateKey': key, 'weight': event.weight, 'waist': event.waist});
+      await _analyticsBox.put('measurements', measList);
+
+      final newMeasurement = MeasurementData(id: id, dateKey: key, weight: event.weight, waist: event.waist);
+      emit(AnalyticsState(
+        dailyData: state.dailyData,
+        measurements: [...state.measurements, newMeasurement],
+        isLoading: false,
+      ));
+    }
   }
 
   Future<void> _onUpdateMeasurement(UpdateMeasurement event, Emitter<AnalyticsState> emit) async {
