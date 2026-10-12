@@ -142,12 +142,12 @@ class _TransformationTimelinePageState extends State<TransformationTimelinePage>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              leading: Icon(Icons.photo_library_outlined, color: AppColors.primary),
               title: Text(settings.isTamil ? 'கேலரி' : 'Gallery'),
               onTap: () { Navigator.pop(ctx); _uploadPhoto(ImageSource.gallery); },
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined, color: AppColors.accent),
+              leading: Icon(Icons.camera_alt_outlined, color: AppColors.accent),
               title: Text(settings.isTamil ? 'கேமரா' : 'Camera'),
               onTap: () { Navigator.pop(ctx); _uploadPhoto(ImageSource.camera); },
             ),

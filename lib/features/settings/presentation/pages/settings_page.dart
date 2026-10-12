@@ -19,6 +19,7 @@ class SettingsPage extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(title: Text(state.isTamil ? 'அமைப்புகள்' : 'Settings')),
           body: ListView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.all(16),
             children: [
               // ── Profile ──────────────────────────────────
@@ -60,7 +61,7 @@ class SettingsPage extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 border: Border.all(color: AppColors.surfaceDark, width: 2),
                               ),
-                              child: const Icon(Icons.camera_alt, size: 10, color: AppColors.backgroundDark),
+                              child: Icon(Icons.camera_alt, size: 10, color: AppColors.backgroundDark),
                             ),
                           ),
                         ],
@@ -98,6 +99,103 @@ class SettingsPage extends StatelessWidget {
                 trailing: Switch(
                   value: state.isDarkMode,
                   onChanged: (_) => context.read<SettingsBloc>().add(const ToggleTheme()),
+                ),
+              ),
+
+              // ── Color Theme Palette Selector ────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.palette_outlined, size: 18, color: AppColors.textSecondaryDark),
+                        const SizedBox(width: 8),
+                        Text(
+                          state.isTamil ? 'வண்ணத் திட்டம் (Color Theme)' : 'Color Theme Palette',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 84,
+                      child: ListView(
+                        physics: const BouncingScrollPhysics(),
+                        scrollDirection: Axis.horizontal,
+                        children: AppColors.palettes.values.map((palette) {
+                          final isSelected = state.colorTheme == palette.id;
+                          return GestureDetector(
+                            onTap: () {
+                              context.read<SettingsBloc>().add(ChangeColorTheme(palette.id));
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 130,
+                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? palette.primary.withAlpha(35)
+                                    : (state.isDarkMode ? AppColors.surfaceAltDark : AppColors.surfaceAltLight),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected ? palette.primary : palette.borderDark.withAlpha(80),
+                                  width: isSelected ? 2 : 1,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: palette.primary.withAlpha(60),
+                                          blurRadius: 10,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: palette.primaryGradient,
+                                          border: Border.all(
+                                            color: isSelected ? Colors.white : Colors.transparent,
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(palette.emoji, style: const TextStyle(fontSize: 16)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    state.isTamil ? palette.nameTa : palette.nameEn,
+                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                      color: isSelected ? palette.primary : null,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -216,7 +314,7 @@ class SettingsPage extends StatelessWidget {
               ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
 
               const SizedBox(height: 80),
-            ].animate(interval: 60.ms).fadeIn(duration: 300.ms).slideX(begin: 0.05),
+            ],
           ),
         );
       },
@@ -256,12 +354,12 @@ class SettingsPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              leading: Icon(Icons.photo_library_outlined, color: AppColors.primary),
               title: Text(state.isTamil ? 'கேலரி' : 'Gallery'),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined, color: AppColors.accent),
+              leading: Icon(Icons.camera_alt_outlined, color: AppColors.accent),
               title: Text(state.isTamil ? 'கேமரா' : 'Camera'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),

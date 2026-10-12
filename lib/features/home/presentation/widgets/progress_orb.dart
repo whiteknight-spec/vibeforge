@@ -57,25 +57,29 @@ class _ProgressOrbState extends State<ProgressOrb> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulseAnim, _fillAnim]),
-      builder: (context, child) {
-        final fill = _fillAnim.value;
-        final color = _orbColor(fill);
-        return Transform.scale(
-          scale: _pulseAnim.value,
-          child: Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: color.withAlpha((fill * 100).round()), blurRadius: 30 + fill * 20, spreadRadius: fill * 8),
-                BoxShadow(color: color.withAlpha((fill * 40).round()), blurRadius: 60, spreadRadius: fill * 12),
-              ],
-            ),
-            child: CustomPaint(
-              painter: _OrbPainter(fillRate: fill, color: color),
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_pulseAnim, _fillAnim]),
+        builder: (context, child) {
+          final fill = _fillAnim.value;
+          final color = _orbColor(fill);
+          return Transform.scale(
+            scale: _pulseAnim.value,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withAlpha((fill * 70).round()),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: CustomPaint(
+                painter: _OrbPainter(fillRate: fill, color: color),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -101,7 +105,8 @@ class _ProgressOrbState extends State<ProgressOrb> with TickerProviderStateMixin
           ),
         );
       },
-    );
+    ),
+  );
   }
 }
 

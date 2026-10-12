@@ -24,7 +24,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     context.go('/home');
   }
 
-  static const _pages = [
+  static final _pages = [
     _OnboardingData(
       emoji: '✅',
       title: 'Track Your Habits',

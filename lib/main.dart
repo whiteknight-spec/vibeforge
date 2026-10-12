@@ -49,8 +49,8 @@ class VibeForgeApp extends StatelessWidget {
           return MaterialApp.router(
             title: 'VibeForge',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightThemeFor(settingsState.colorTheme),
+            darkTheme: AppTheme.darkThemeFor(settingsState.colorTheme),
             themeMode: settingsState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             locale: Locale(settingsState.languageCode),
             supportedLocales: AppLocalizations.supportedLocales,

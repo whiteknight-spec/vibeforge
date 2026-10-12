@@ -62,7 +62,7 @@ class LoginPage extends StatelessWidget {
                   Text(
                     'VibeForge',
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      foreground: Paint()..shader = const LinearGradient(
+                      foreground: Paint()..shader = LinearGradient(
                         colors: [AppColors.primary, AppColors.secondary],
                       ).createShader(const Rect.fromLTWH(0, 0, 200, 50)),
                       fontWeight: FontWeight.w900,
@@ -99,7 +99,7 @@ class LoginPage extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => _handleLogin(context),
-                    child: const Text('Continue as Guest', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                    child: Text('Continue as Guest', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
                   ),
 
                   const SizedBox(height: 12),

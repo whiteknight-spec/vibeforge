@@ -34,27 +34,27 @@ class ShellPage extends StatelessWidget {
           destinations: [
             NavigationDestination(
               icon: Icon(Icons.home_outlined, color: current == 0 ? AppColors.primary : null),
-              selectedIcon: const Icon(Icons.home_rounded, color: AppColors.primary),
+              selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
               label: 'Home',
             ),
             NavigationDestination(
               icon: Icon(Icons.checklist_outlined, color: current == 1 ? AppColors.primary : null),
-              selectedIcon: const Icon(Icons.checklist_rounded, color: AppColors.primary),
+              selectedIcon: Icon(Icons.checklist_rounded, color: AppColors.primary),
               label: 'Checklist',
             ),
             NavigationDestination(
               icon: Icon(Icons.analytics_outlined, color: current == 2 ? AppColors.primary : null),
-              selectedIcon: const Icon(Icons.analytics_rounded, color: AppColors.primary),
+              selectedIcon: Icon(Icons.analytics_rounded, color: AppColors.primary),
               label: 'Analytics',
             ),
             NavigationDestination(
               icon: Icon(Icons.auto_awesome_outlined, color: current == 3 ? AppColors.primary : null),
-              selectedIcon: const Icon(Icons.auto_awesome, color: AppColors.primary),
+              selectedIcon: Icon(Icons.auto_awesome, color: AppColors.primary),
               label: 'AI Coach',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined, color: current == 4 ? AppColors.primary : null),
-              selectedIcon: const Icon(Icons.settings_rounded, color: AppColors.primary),
+              selectedIcon: Icon(Icons.settings_rounded, color: AppColors.primary),
               label: 'Settings',
             ),
           ],

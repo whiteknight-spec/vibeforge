@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// VibeForge theme – dark neon primary + clean light mode.
+/// VibeForge theme engine – dynamic multi-palette system with 60/120 FPS buttery transitions.
 class AppTheme {
   AppTheme._();
 
@@ -35,171 +35,185 @@ class AppTheme {
     );
   }
 
-  // ── Dark Theme ────────────────────────────────────────────────
-  static ThemeData get darkTheme => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: const ColorScheme.dark(
-      primary: AppColors.primary,
-      onPrimary: AppColors.backgroundDark,
-      secondary: AppColors.secondary,
-      onSecondary: Colors.white,
-      tertiary: AppColors.accent,
-      surface: AppColors.surfaceDark,
-      onSurface: AppColors.textPrimaryDark,
-      error: AppColors.error,
-      onError: Colors.white,
-    ),
-    scaffoldBackgroundColor: AppColors.backgroundDark,
-    textTheme: _buildTextTheme(Brightness.dark),
-    appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.backgroundDark,
-      foregroundColor: AppColors.textPrimaryDark,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: true,
-      systemOverlayStyle: SystemUiOverlayStyle.light,
-    ),
-    cardTheme: CardThemeData(
-      color: AppColors.surfaceDark,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.borderDark.withAlpha(128)),
-      ),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-    ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.backgroundDark,
-      elevation: 8,
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surfaceAltDark,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.borderDark.withAlpha(77))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: AppColors.surfaceDark,
-      indicatorColor: AppColors.primarySurface,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      height: 70,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-    ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.surfaceDark,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      showDragHandle: true,
-    ),
-    dialogTheme: DialogThemeData(
-      backgroundColor: AppColors.surfaceDark,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    ),
-    snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.surfaceElevatedDark,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      behavior: SnackBarBehavior.floating,
-    ),
-    dividerTheme: DividerThemeData(color: AppColors.borderDark.withAlpha(77)),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.primary, linearTrackColor: AppColors.surfaceAltDark),
-    checkboxTheme: CheckboxThemeData(
-      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primary : Colors.transparent),
-      checkColor: WidgetStateProperty.all(AppColors.backgroundDark),
-      side: const BorderSide(color: AppColors.textTertiaryDark, width: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-    ),
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primary : AppColors.textTertiaryDark),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primarySurface : AppColors.surfaceAltDark),
-    ),
-    pageTransitionsTheme: PageTransitionsTheme(builders: {
-      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-    }),
-  );
+  // ── Dark Theme with Palette Support ───────────────────────────
+  static ThemeData darkThemeFor(String themeKey) {
+    AppColors.setPalette(themeKey);
+    final palette = AppColors.currentPalette;
 
-  // ── Light Theme ───────────────────────────────────────────────
-  static ThemeData get lightTheme => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
-    colorScheme: const ColorScheme.light(
-      primary: AppColors.primaryDim,
-      onPrimary: Colors.white,
-      secondary: AppColors.secondary,
-      onSecondary: Colors.white,
-      surface: AppColors.surfaceLight,
-      onSurface: AppColors.textPrimaryLight,
-      error: AppColors.error,
-      onError: Colors.white,
-    ),
-    scaffoldBackgroundColor: AppColors.backgroundLight,
-    textTheme: _buildTextTheme(Brightness.light),
-    appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.backgroundLight,
-      foregroundColor: AppColors.textPrimaryLight,
-      elevation: 0,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-    ),
-    cardTheme: CardThemeData(
-      color: AppColors.surfaceLight,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.borderLight.withAlpha(128)),
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.dark(
+        primary: palette.primary,
+        onPrimary: palette.backgroundDark,
+        secondary: palette.secondary,
+        onSecondary: Colors.white,
+        tertiary: palette.accent,
+        surface: palette.surfaceDark,
+        onSurface: AppColors.textPrimaryDark,
+        error: AppColors.error,
+        onError: Colors.white,
       ),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primaryDim,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      scaffoldBackgroundColor: palette.backgroundDark,
+      textTheme: _buildTextTheme(Brightness.dark),
+      appBarTheme: AppBarTheme(
+        backgroundColor: palette.backgroundDark,
+        foregroundColor: AppColors.textPrimaryDark,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
+      cardTheme: CardThemeData(
+        color: palette.surfaceDark,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: palette.borderDark.withAlpha(128)),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.primary,
+          foregroundColor: palette.backgroundDark,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: palette.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: BorderSide(color: palette.primary, width: 1.5),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: palette.primary,
+        foregroundColor: palette.backgroundDark,
+        elevation: 8,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: palette.surfaceAltDark,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: palette.borderDark.withAlpha(77))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: palette.primary, width: 1.5)),
+        errorBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: AppColors.error, width: 1.5)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: palette.surfaceDark,
+        indicatorColor: palette.primarySurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 70,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: palette.surfaceDark,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        showDragHandle: true,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: palette.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: palette.surfaceElevatedDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        behavior: SnackBarBehavior.floating,
       ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surfaceAltLight,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primaryDim, width: 1.5)),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: AppColors.surfaceLight,
-      indicatorColor: AppColors.primaryDim.withAlpha(38),
-      elevation: 1,
-      height: 70,
-    ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.surfaceLight,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      showDragHandle: true,
-    ),
-    pageTransitionsTheme: PageTransitionsTheme(builders: {
-      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-    }),
-  );
+      dividerTheme: DividerThemeData(color: palette.borderDark.withAlpha(77)),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: palette.primary, linearTrackColor: palette.surfaceAltDark),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? palette.primary : Colors.transparent),
+        checkColor: WidgetStateProperty.all(palette.backgroundDark),
+        side: const BorderSide(color: AppColors.textTertiaryDark, width: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? palette.primary : AppColors.textTertiaryDark),
+        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? palette.primarySurface : palette.surfaceAltDark),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      }),
+    );
+  }
+
+  static ThemeData get darkTheme => darkThemeFor('cyber_neon');
+
+  // ── Light Theme with Palette Support ──────────────────────────
+  static ThemeData lightThemeFor(String themeKey) {
+    AppColors.setPalette(themeKey);
+    final palette = AppColors.currentPalette;
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.light(
+        primary: palette.primaryDim,
+        onPrimary: Colors.white,
+        secondary: palette.secondary,
+        onSecondary: Colors.white,
+        surface: AppColors.surfaceLight,
+        onSurface: AppColors.textPrimaryLight,
+        error: AppColors.error,
+        onError: Colors.white,
+      ),
+      scaffoldBackgroundColor: AppColors.backgroundLight,
+      textTheme: _buildTextTheme(Brightness.light),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.backgroundLight,
+        foregroundColor: AppColors.textPrimaryLight,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.surfaceLight,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.borderLight.withAlpha(128)),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.primaryDim,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surfaceAltLight,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: palette.primaryDim, width: 1.5)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        indicatorColor: palette.primaryDim.withAlpha(38),
+        elevation: 1,
+        height: 70,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        showDragHandle: true,
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      }),
+    );
+  }
+
+  static ThemeData get lightTheme => lightThemeFor('cyber_neon');
 }

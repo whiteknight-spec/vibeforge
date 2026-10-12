@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -37,6 +36,7 @@ class HomePage extends StatelessWidget {
             return Scaffold(
               body: SafeArea(
                 child: CustomScrollView(
+                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                   slivers: [
                     // ── Greeting Header ────────────────────────────
                     SliverToBoxAdapter(
@@ -51,14 +51,14 @@ class HomePage extends StatelessWidget {
                                   Text(
                                     greeting,
                                     style: Theme.of(context).textTheme.headlineLarge,
-                                  ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.1),
+                                  ),
                                   const SizedBox(height: 4),
                                   Text(
                                     subtitle,
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                     ),
-                                  ).animate().fadeIn(duration: 500.ms, delay: 100.ms),
+                                  ),
                                 ],
                               ),
                             ),
@@ -81,7 +81,7 @@ class HomePage extends StatelessWidget {
                                         style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.backgroundDark, fontWeight: FontWeight.w700)),
                                     )
                                   : null,
-                            ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+                            ),
                           ],
                         ),
                       ),
@@ -98,7 +98,7 @@ class HomePage extends StatelessWidget {
                             totalCount: checklist.totalCount,
                           ),
                         ),
-                      ).animate().fadeIn(duration: 600.ms, delay: 200.ms).scale(begin: const Offset(0.8, 0.8)),
+                      ),
                     ),
 
                     // ── Streak & Stats Row ─────────────────────────
@@ -138,7 +138,7 @@ class HomePage extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ).animate().fadeIn(duration: 500.ms, delay: 300.ms).slideY(begin: 0.1),
+                        ),
                       ),
                     ),
 
@@ -157,6 +157,7 @@ class HomePage extends StatelessWidget {
                       child: SizedBox(
                         height: 100,
                         child: ListView(
+                          physics: const BouncingScrollPhysics(),
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           children: [
@@ -190,7 +191,7 @@ class HomePage extends StatelessWidget {
                               color: AppColors.primary,
                               onTap: () => context.push('/transformation'),
                             ),
-                          ].animate(interval: 80.ms).fadeIn(duration: 400.ms).slideX(begin: 0.2),
+                          ],
                         ),
                       ),
                     ),
@@ -208,7 +209,7 @@ class HomePage extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.format_quote_rounded, color: AppColors.secondary, size: 20),
+                                  Icon(Icons.format_quote_rounded, color: AppColors.secondary, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     settings.isTamil ? 'இன்றைய ஊக்கம்' : 'Daily Motivation',
@@ -227,7 +228,7 @@ class HomePage extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ).animate().fadeIn(duration: 500.ms, delay: 500.ms),
+                      ),
                     ),
 
                     // ── Transformation Photo Banner ────────────────
@@ -289,7 +290,7 @@ class HomePage extends StatelessWidget {
                             );
                           },
                         ),
-                      ).animate().fadeIn(duration: 500.ms, delay: 550.ms),
+                      ),
                     ),
 
                     // ── Incomplete Tasks Preview ───────────────────
@@ -339,7 +340,7 @@ class HomePage extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                            ).animate().fadeIn(duration: 300.ms, delay: (index * 50).ms);
+                            );
                           },
                           childCount: checklist.items.where((i) => !i.isCompleted).length,
                         ),

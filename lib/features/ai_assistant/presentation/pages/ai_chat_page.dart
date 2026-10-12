@@ -349,7 +349,7 @@ class _AiChatPageState extends State<AiChatPage> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.bolt, size: 16, color: AppColors.primary),
+                                  Icon(Icons.bolt, size: 16, color: AppColors.primary),
                                   const SizedBox(width: 6),
                                   Text(
                                     settings.isTamil ? 'தன்னியக்க செயல்பாடு (Autonomous Tools)' : 'Autonomous Tool Actions',
@@ -608,7 +608,7 @@ class _TypingIndicator extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+            Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
             const SizedBox(width: 8),
             const Text(
               'Autonomous Agent reasoning...',
@@ -621,7 +621,7 @@ class _TypingIndicator extends StatelessWidget {
                 width: 6,
                 height: 6,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
               )
                   .animate(onPlay: (c) => c.repeat())
                   .fadeIn(delay: (i * 200).ms, duration: 400.ms)

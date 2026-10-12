@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:vibeforge/core/constants/app_constants.dart';
+import 'package:vibeforge/core/theme/app_colors.dart';
 import 'package:vibeforge/features/checklist/presentation/bloc/checklist_bloc.dart';
 import 'package:vibeforge/features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'package:vibeforge/features/settings/presentation/bloc/settings_bloc.dart';
@@ -347,6 +348,26 @@ void main() {
       final updateRes = aiAgent.updateChecklistItem(itemId: item.id, newTitle: 'Updated Habit', newIcon: '🔥');
       expect(updateRes.success, true);
       expect(updateRes.data['title'], 'Updated Habit');
+    });
+
+    test('Dynamic Theme Palette: ChangeColorTheme updates and persists themeKey', () async {
+      settingsBloc.add(const ChangeColorTheme('royal_amethyst'));
+      await Future.delayed(const Duration(milliseconds: 50));
+      expect(settingsBloc.state.colorTheme, 'royal_amethyst');
+
+      final box = Hive.box(AppConstants.hiveSettingsBox);
+      expect(box.get('colorTheme'), 'royal_amethyst');
+    });
+
+    test('ThemePalette: palettes contain all 5 pro designer schemes', () {
+      expect(AppColors.palettes.containsKey('cyber_neon'), true);
+      expect(AppColors.palettes.containsKey('obsidian_gold'), true);
+      expect(AppColors.palettes.containsKey('royal_amethyst'), true);
+      expect(AppColors.palettes.containsKey('matrix_emerald'), true);
+      expect(AppColors.palettes.containsKey('crimson_ember'), true);
+
+      AppColors.setPalette('matrix_emerald');
+      expect(AppColors.primary, AppColors.palettes['matrix_emerald']!.primary);
     });
   });
 }

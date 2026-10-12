@@ -71,6 +71,7 @@ class ChecklistPage extends StatelessWidget {
                       ),
                       Expanded(
                         child: ReorderableListView.builder(
+                          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                           padding: const EdgeInsets.fromLTRB(8, 12, 8, 100),
                           itemCount: state.items.length,
                           // ignore: deprecated_member_use
@@ -186,14 +187,14 @@ class ChecklistPage extends StatelessWidget {
                                                 : null,
                                           ),
                                           child: item.isCompleted
-                                              ? const Icon(Icons.check, size: 16, color: AppColors.backgroundDark)
+                                              ? Icon(Icons.check, size: 16, color: AppColors.backgroundDark)
                                               : null,
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
-                              ).animate().fadeIn(duration: 300.ms, delay: (index * 40).ms),
+                              ),
                             );
                           },
                         ),
@@ -356,7 +357,7 @@ class ChecklistPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+              leading: Icon(Icons.edit_outlined, color: AppColors.primary),
               title: Text(settings.isTamil ? 'திருத்து' : 'Edit'),
               onTap: () {
                 Navigator.pop(ctx);

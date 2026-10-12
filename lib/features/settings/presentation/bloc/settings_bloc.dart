@@ -18,6 +18,13 @@ class ToggleTheme extends SettingsEvent {
   const ToggleTheme();
 }
 
+class ChangeColorTheme extends SettingsEvent {
+  final String colorTheme;
+  const ChangeColorTheme(this.colorTheme);
+  @override
+  List<Object?> get props => [colorTheme];
+}
+
 class ChangeLanguage extends SettingsEvent {
   final String languageCode;
   const ChangeLanguage(this.languageCode);
@@ -50,6 +57,7 @@ class UpdateProfilePicture extends SettingsEvent {
 // ── State ───────────────────────────────────────────────────────
 class SettingsState extends Equatable {
   final bool isDarkMode;
+  final String colorTheme;
   final String languageCode;
   final bool isCloudBackupEnabled;
   final bool isAiEnabled;
@@ -58,6 +66,7 @@ class SettingsState extends Equatable {
 
   const SettingsState({
     this.isDarkMode = true,
+    this.colorTheme = 'cyber_neon',
     this.languageCode = 'en',
     this.isCloudBackupEnabled = false,
     this.isAiEnabled = true,
@@ -69,6 +78,7 @@ class SettingsState extends Equatable {
 
   SettingsState copyWith({
     bool? isDarkMode,
+    String? colorTheme,
     String? languageCode,
     bool? isCloudBackupEnabled,
     bool? isAiEnabled,
@@ -77,6 +87,7 @@ class SettingsState extends Equatable {
     bool clearProfilePicture = false,
   }) => SettingsState(
     isDarkMode: isDarkMode ?? this.isDarkMode,
+    colorTheme: colorTheme ?? this.colorTheme,
     languageCode: languageCode ?? this.languageCode,
     isCloudBackupEnabled: isCloudBackupEnabled ?? this.isCloudBackupEnabled,
     isAiEnabled: isAiEnabled ?? this.isAiEnabled,
@@ -85,7 +96,15 @@ class SettingsState extends Equatable {
   );
 
   @override
-  List<Object?> get props => [isDarkMode, languageCode, isCloudBackupEnabled, isAiEnabled, userName, profilePicturePath];
+  List<Object?> get props => [
+    isDarkMode,
+    colorTheme,
+    languageCode,
+    isCloudBackupEnabled,
+    isAiEnabled,
+    userName,
+    profilePicturePath,
+  ];
 }
 
 // ── BLoC ────────────────────────────────────────────────────────
@@ -93,6 +112,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   SettingsBloc() : super(const SettingsState()) {
     on<LoadSettings>(_onLoad);
     on<ToggleTheme>(_onToggleTheme);
+    on<ChangeColorTheme>(_onChangeColorTheme);
     on<ChangeLanguage>(_onChangeLanguage);
     on<ToggleCloudBackup>(_onToggleCloud);
     on<ToggleAI>(_onToggleAI);
@@ -105,6 +125,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   Future<void> _onLoad(LoadSettings event, Emitter<SettingsState> emit) async {
     emit(SettingsState(
       isDarkMode: _box.get('isDarkMode', defaultValue: true),
+      colorTheme: _box.get('colorTheme', defaultValue: 'cyber_neon'),
       languageCode: _box.get('languageCode', defaultValue: 'en'),
       isCloudBackupEnabled: _box.get('cloudBackup', defaultValue: false),
       isAiEnabled: _box.get('aiEnabled', defaultValue: true),
@@ -117,6 +138,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final newVal = !state.isDarkMode;
     await _box.put('isDarkMode', newVal);
     emit(state.copyWith(isDarkMode: newVal));
+  }
+
+  Future<void> _onChangeColorTheme(ChangeColorTheme event, Emitter<SettingsState> emit) async {
+    await _box.put('colorTheme', event.colorTheme);
+    emit(state.copyWith(colorTheme: event.colorTheme));
   }
 
   Future<void> _onChangeLanguage(ChangeLanguage event, Emitter<SettingsState> emit) async {
