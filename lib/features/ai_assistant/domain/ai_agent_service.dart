@@ -902,6 +902,9 @@ class AiAgentService {
           await Future.delayed(const Duration(milliseconds: 1000));
           continue;
         }
+        if (e is SocketException || e.toString().contains('Failed host lookup') || e.toString().contains('SocketException')) {
+          return {'error': {'message': 'இணைய இணைப்பு இல்லை. Please check your internet connection (Wi-Fi or Mobile Data).'}};
+        }
         return {'error': {'message': 'Connection error: $e'}};
       } finally {
         client.close();
