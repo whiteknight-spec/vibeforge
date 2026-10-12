@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/neon_card.dart';
@@ -11,6 +14,7 @@ import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../checklist/presentation/bloc/checklist_bloc.dart';
 import '../../../analytics/presentation/bloc/analytics_bloc.dart';
 import '../../domain/ai_agent_service.dart';
+import '../../domain/chat_session.dart';
 import '../../domain/exercise_guides_data.dart';
 
 class AiChatPage extends StatefulWidget {
@@ -23,29 +27,111 @@ class AiChatPage extends StatefulWidget {
 class _AiChatPageState extends State<AiChatPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final List<_ChatMessage> _messages = [];
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  final List<ChatSession> _sessions = [];
+  String _activeSessionId = '';
   bool _isTyping = false;
 
   Box get _chatBox => Hive.box(AppConstants.hiveAiChatBox);
 
+  ChatSession get _activeSession {
+    if (_sessions.isEmpty) {
+      final initial = _createDefaultSession();
+      _sessions.add(initial);
+      _activeSessionId = initial.id;
+      return initial;
+    }
+    return _sessions.firstWhere(
+      (s) => s.id == _activeSessionId,
+      orElse: () => _sessions.first,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadChatHistory();
+    _loadSessions();
   }
 
-  void _loadChatHistory() {
-    final stored = _chatBox.get('history', defaultValue: []) as List;
-    if (stored.isNotEmpty) {
-      for (final item in stored) {
+  ChatSession _createDefaultSession({String? title}) {
+    final now = DateTime.now();
+    return ChatSession(
+      id: now.millisecondsSinceEpoch.toString(),
+      title: title ?? 'New Chat',
+      createdAt: now,
+      updatedAt: now,
+      messages: [
+        ChatMessage(
+          text: '',
+          isUser: false,
+          isWelcome: true,
+          timestamp: now,
+        ),
+      ],
+    );
+  }
+
+  void _loadSessions() {
+    final storedSessions = _chatBox.get('sessions') as List?;
+    _sessions.clear();
+
+    if (storedSessions != null && storedSessions.isNotEmpty) {
+      for (final item in storedSessions) {
         if (item is Map) {
-          _messages.add(_ChatMessage.fromJson(Map<String, dynamic>.from(item)));
+          try {
+            _sessions.add(ChatSession.fromJson(Map<String, dynamic>.from(item)));
+          } catch (_) {}
         }
       }
     }
 
-    if (_messages.isEmpty) {
-      _messages.add(_ChatMessage(
+    // Migration from single legacy 'history' if present
+    if (_sessions.isEmpty) {
+      final legacyHistory = _chatBox.get('history') as List?;
+      if (legacyHistory != null && legacyHistory.isNotEmpty) {
+        final legacyMessages = <ChatMessage>[];
+        for (final item in legacyHistory) {
+          if (item is Map) {
+            try {
+              legacyMessages.add(ChatMessage.fromJson(Map<String, dynamic>.from(item)));
+            } catch (_) {}
+          }
+        }
+        if (legacyMessages.isNotEmpty) {
+          final firstUser = legacyMessages.firstWhere(
+            (m) => m.isUser,
+            orElse: () => ChatMessage(text: 'Previous Chat', isUser: true),
+          );
+          final migrated = ChatSession(
+            id: 'legacy_${DateTime.now().millisecondsSinceEpoch}',
+            title: ChatSession.generateTitle(firstUser.text),
+            createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+            updatedAt: DateTime.now(),
+            messages: legacyMessages,
+          );
+          _sessions.add(migrated);
+        }
+      }
+    }
+
+    if (_sessions.isEmpty) {
+      _sessions.add(_createDefaultSession());
+    }
+
+    // Sort by recent updatedAt descending
+    _sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    final savedActiveId = _chatBox.get('active_session_id') as String?;
+    if (savedActiveId != null && _sessions.any((s) => s.id == savedActiveId)) {
+      _activeSessionId = savedActiveId;
+    } else {
+      _activeSessionId = _sessions.first.id;
+    }
+
+    // Ensure active session has welcome card if empty
+    if (_activeSession.messages.isEmpty) {
+      _activeSession.messages.add(ChatMessage(
         text: '',
         isUser: false,
         isWelcome: true,
@@ -53,38 +139,198 @@ class _AiChatPageState extends State<AiChatPage> {
     }
   }
 
-  void _persistChatHistory() {
-    final toSave = _messages
-        .where((m) => !m.isWelcome)
-        .map((m) => m.toJson())
-        .toList();
-    _chatBox.put('history', toSave);
+  void _persistSessions() {
+    final toSave = _sessions.map((s) => s.toJson()).toList();
+    _chatBox.put('sessions', toSave);
+    _chatBox.put('active_session_id', _activeSessionId);
   }
 
-  void _clearChat(SettingsState settings) {
+  void _createNewSession(SettingsState settings) {
+    final newSession = _createDefaultSession(
+      title: settings.isTamil ? 'புதிய உரையாடல்' : 'New Chat',
+    );
+    setState(() {
+      _sessions.insert(0, newSession);
+      _activeSessionId = newSession.id;
+      _isTyping = false;
+    });
+    _persistSessions();
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+      Navigator.pop(context);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(settings.isTamil ? 'புதிய உரையாடல் துவக்கப்பட்டது' : 'New conversation started'),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _switchSession(String sessionId) {
+    setState(() {
+      _activeSessionId = sessionId;
+      _isTyping = false;
+      if (_activeSession.messages.isEmpty) {
+        _activeSession.messages.add(ChatMessage(
+          text: '',
+          isUser: false,
+          isWelcome: true,
+        ));
+      }
+    });
+    _chatBox.put('active_session_id', _activeSessionId);
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+      Navigator.pop(context);
+    }
+    _scrollToBottom();
+  }
+
+  void _renameSession(ChatSession session, SettingsState settings) {
+    final titleCtl = TextEditingController(text: session.title);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(settings.isTamil ? 'உரையாடலை அழிக்கவா?' : 'Clear Conversation?'),
-        content: Text(settings.isTamil
-            ? 'அனைத்து பழைய AI உரையாடல்களும் அழிக்கப்படும்.'
-            : 'All previous AI agent conversation history will be cleared.'),
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(settings.isTamil ? 'தலைப்பை மாற்றவும்' : 'Rename Conversation'),
+        content: TextField(
+          controller: titleCtl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: settings.isTamil ? 'உரையாடல் தலைப்பு...' : 'Conversation title...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(settings.isTamil ? 'ரத்துசெய்' : 'Cancel'),
+            child: Text(settings.isTamil ? 'ரத்து' : 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newTitle = titleCtl.text.trim();
+              if (newTitle.isNotEmpty) {
+                setState(() {
+                  session.title = newTitle;
+                });
+                _persistSessions();
+              }
+              Navigator.pop(ctx);
+            },
+            child: Text(settings.isTamil ? 'சேமி' : 'Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteSession(String sessionId, SettingsState settings) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(settings.isTamil ? 'உரையாடலை நீக்கவா?' : 'Delete Conversation?'),
+        content: Text(settings.isTamil
+            ? 'இந்த குறிப்பிட்ட AI உரையாடல் நிரந்தரமாக நீக்கப்படும்.'
+            : 'This conversation will be permanently removed from your history.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(settings.isTamil ? 'ரத்து' : 'Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () {
               Navigator.pop(ctx);
               setState(() {
-                _messages.clear();
-                _messages.add(_ChatMessage(text: '', isUser: false, isWelcome: true));
+                _sessions.removeWhere((s) => s.id == sessionId);
+                if (_sessions.isEmpty) {
+                  _sessions.add(_createDefaultSession());
+                }
+                if (_activeSessionId == sessionId) {
+                  _activeSessionId = _sessions.first.id;
+                }
               });
-              _chatBox.delete('history');
+              _persistSessions();
+            },
+            child: Text(settings.isTamil ? 'நீக்கு' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearCurrentSession(SettingsState settings) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(settings.isTamil ? 'செயலில் உள்ள அரட்டையை அழிக்கவா?' : 'Clear Current Chat?'),
+        content: Text(settings.isTamil
+            ? 'இந்த உரையாடலின் அனைத்து செய்திகளும் அழிக்கப்படும்.'
+            : 'All messages in this conversation will be cleared.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(settings.isTamil ? 'ரத்து' : 'Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _activeSession.messages.clear();
+                _activeSession.messages.add(ChatMessage(
+                  text: '',
+                  isUser: false,
+                  isWelcome: true,
+                ));
+              });
+              _persistSessions();
             },
             child: Text(settings.isTamil ? 'அழி' : 'Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearAllHistory(SettingsState settings) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(settings.isTamil ? 'அனைத்து வரலாற்றையும் அழிக்கவா?' : 'Clear All History?'),
+        content: Text(settings.isTamil
+            ? 'அனைத்து பழைய AI உரையாடல்களும் நிரந்தரமாக அழிக்கப்படும்.'
+            : 'All previous AI conversations across all sessions will be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(settings.isTamil ? 'ரத்து' : 'Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _sessions.clear();
+                final fresh = _createDefaultSession();
+                _sessions.add(fresh);
+                _activeSessionId = fresh.id;
+              });
+              _chatBox.delete('sessions');
+              _chatBox.delete('history');
+              _chatBox.put('active_session_id', _activeSessionId);
+              if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                Navigator.pop(context);
+              }
+            },
+            child: Text(settings.isTamil ? 'அனைத்தும் அழி' : 'Clear All'),
           ),
         ],
       ),
@@ -100,7 +346,7 @@ class _AiChatPageState extends State<AiChatPage> {
 
   List<Map<String, String>> _buildChatHistory() {
     final history = <Map<String, String>>[];
-    for (final m in _messages) {
+    for (final m in _activeSession.messages) {
       if (m.isWelcome || m.isToolStep) continue;
       history.add({
         'role': m.isUser ? 'user' : 'model',
@@ -115,11 +361,25 @@ class _AiChatPageState extends State<AiChatPage> {
     if (trimmed.isEmpty || _isTyping) return;
 
     _controller.clear();
+    final now = DateTime.now();
+
+    // Auto-update session title on first user message if it's currently generic
+    if (_activeSession.title == 'New Chat' ||
+        _activeSession.title == 'புதிய உரையாடல்' ||
+        _activeSession.title.isEmpty) {
+      _activeSession.title = ChatSession.generateTitle(trimmed);
+    }
+    _activeSession.updatedAt = now;
+
     setState(() {
-      _messages.add(_ChatMessage(text: trimmed, isUser: true));
+      _activeSession.messages.add(ChatMessage(
+        text: trimmed,
+        isUser: true,
+        timestamp: now,
+      ));
       _isTyping = true;
     });
-    _persistChatHistory();
+    _persistSessions();
     _scrollToBottom();
 
     final agent = AiAgentService(
@@ -137,13 +397,14 @@ class _AiChatPageState extends State<AiChatPage> {
       if (response.toolSteps.isNotEmpty) {
         setState(() {
           _isTyping = false;
-          _messages.add(_ChatMessage(
+          _activeSession.messages.add(ChatMessage(
             text: response.toolSteps.join('\n'),
             isUser: false,
             isToolStep: true,
+            timestamp: DateTime.now(),
           ));
         });
-        _persistChatHistory();
+        _persistSessions();
         _scrollToBottom();
 
         await Future.delayed(const Duration(milliseconds: 300));
@@ -152,23 +413,26 @@ class _AiChatPageState extends State<AiChatPage> {
 
       setState(() {
         _isTyping = false;
-        _messages.add(_ChatMessage(
+        _activeSession.updatedAt = DateTime.now();
+        _activeSession.messages.add(ChatMessage(
           text: response.message,
           isUser: false,
+          timestamp: DateTime.now(),
         ));
       });
-      _persistChatHistory();
+      _persistSessions();
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isTyping = false;
-        _messages.add(_ChatMessage(
+        _activeSession.messages.add(ChatMessage(
           text: settings.isTamil ? '❌ பிழை ஏற்பட்டது: $e' : '❌ Error occurred: $e',
           isUser: false,
+          timestamp: DateTime.now(),
         ));
       });
-      _persistChatHistory();
+      _persistSessions();
       _scrollToBottom();
     }
   }
@@ -204,7 +468,11 @@ class _AiChatPageState extends State<AiChatPage> {
           child: Column(
             children: [
               const SizedBox(height: 12),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.borderDark, borderRadius: BorderRadius.circular(2))),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.borderDark, borderRadius: BorderRadius.circular(2)),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                 child: Row(
@@ -279,12 +547,20 @@ class _AiChatPageState extends State<AiChatPage> {
         }
 
         return Scaffold(
+          key: _scaffoldKey,
+          drawer: _buildChatHistoryDrawer(context, settings, isDark, primary),
           appBar: AppBar(
+            leading: IconButton(
+              tooltip: settings.isTamil ? 'உரையாடல் வரலாறு' : 'Chat History',
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+            titleSpacing: 0,
             title: Row(
               children: [
                 Container(
-                  width: 10,
-                  height: 10,
+                  width: 8,
+                  height: 8,
                   margin: const EdgeInsets.only(right: 8),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
@@ -294,14 +570,35 @@ class _AiChatPageState extends State<AiChatPage> {
                     ],
                   ),
                 ),
-                Text(settings.isTamil ? 'AI பயிற்சியாளர்' : 'AI Coach'),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        settings.isTamil ? 'AI பயிற்சியாளர்' : 'AI Coach',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        _activeSession.title,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             actions: [
               IconButton(
-                tooltip: settings.isTamil ? 'அழி' : 'Clear Chat',
-                icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => _clearChat(settings),
+                tooltip: settings.isTamil ? 'புதிய உரையாடல்' : 'New Chat',
+                icon: const Icon(Icons.add_comment_outlined, size: 20),
+                onPressed: () => _createNewSession(settings),
               ),
               IconButton(
                 tooltip: settings.isTamil ? 'ஊக்கம்' : 'Motivation',
@@ -312,6 +609,71 @@ class _AiChatPageState extends State<AiChatPage> {
                       : 'Give me a powerful motivation quote and habit guidance for today.',
                   settings,
                 ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (val) {
+                  switch (val) {
+                    case 'rename':
+                      _renameSession(_activeSession, settings);
+                      break;
+                    case 'clear_current':
+                      _clearCurrentSession(settings);
+                      break;
+                    case 'view_guides':
+                      _showAllExerciseGuidesModal(context, settings);
+                      break;
+                    case 'delete_current':
+                      _deleteSession(_activeSession.id, settings);
+                      break;
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'rename',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text(settings.isTamil ? 'தலைப்பு மாற்று' : 'Rename Chat'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'clear_current',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.refresh_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        Text(settings.isTamil ? 'உரையாடலை துடை' : 'Clear Chat'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'view_guides',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.photo_library_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text(settings.isTamil ? 'பயிற்சி படங்கள்' : 'Exercise Library'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: 'delete_current',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Text(
+                          settings.isTamil ? 'உரையாடலை நீக்கு' : 'Delete Chat',
+                          style: const TextStyle(color: AppColors.error),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -374,19 +736,19 @@ class _AiChatPageState extends State<AiChatPage> {
                 ),
               ),
 
-              // ── Messages List ────────────────────────────
+              // ── Messages List (Clean Gemini / ChatGPT / Claude UI) ──
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: _messages.length + (_isTyping ? 1 : 0),
+                  itemCount: _activeSession.messages.length + (_isTyping ? 1 : 0),
                   itemBuilder: (context, index) {
-                    if (index == _messages.length && _isTyping) {
+                    if (index == _activeSession.messages.length && _isTyping) {
                       return _TypingIndicator().animate().fadeIn();
                     }
 
-                    final msg = _messages[index];
+                    final msg = _activeSession.messages[index];
                     if (msg.isWelcome) {
                       return _WelcomeCard(
                         settings: settings,
@@ -394,7 +756,7 @@ class _AiChatPageState extends State<AiChatPage> {
                       );
                     }
 
-                    // Collapsible & Clean Autonomous Tool Actions
+                    // Collapsible Autonomous Tool Actions
                     if (msg.isToolStep) {
                       return _ToolActionWidget(
                         text: msg.text,
@@ -402,129 +764,27 @@ class _AiChatPageState extends State<AiChatPage> {
                       );
                     }
 
-                    // Regular Message with Markdown & Visual Exercise Guides
-                    final matchingGuides = !msg.isUser
-                        ? ExerciseGuidesData.findMatching(msg.text)
-                        : <ExerciseGuide>[];
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Align(
-                        alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * (msg.isUser ? 0.82 : 0.90),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: msg.isUser
-                                ? primary.withAlpha(35)
-                                : (isDark ? AppColors.surfaceAltDark : AppColors.surfaceAltLight),
-                            borderRadius: BorderRadius.circular(16).copyWith(
-                              bottomRight: msg.isUser ? const Radius.circular(4) : null,
-                              bottomLeft: !msg.isUser ? const Radius.circular(4) : null,
-                            ),
-                            border: Border.all(
-                              color: msg.isUser
-                                  ? primary.withAlpha(80)
-                                  : (isDark ? AppColors.borderDark.withAlpha(77) : AppColors.borderLight),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(isDark ? 50 : 10),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (msg.isUser)
-                                SelectableText(
-                                  msg.text,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    height: 1.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                )
-                              else ...[
-                                // Clean Rich Markdown Rendering
-                                MarkdownBody(
-                                  data: msg.text,
-                                  selectable: true,
-                                  styleSheet: MarkdownStyleSheet(
-                                    p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      height: 1.6,
-                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                    ),
-                                    h1: GoogleFonts.outfit(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: primary,
-                                    ),
-                                    h2: GoogleFonts.outfit(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: primary,
-                                    ),
-                                    h3: GoogleFonts.outfit(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: primary,
-                                    ),
-                                    strong: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white : Colors.black,
-                                    ),
-                                    em: TextStyle(
-                                      fontStyle: FontStyle.italic,
-                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                    ),
-                                    listBullet: TextStyle(
-                                      color: primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    horizontalRuleDecoration: BoxDecoration(
-                                      border: Border(
-                                        top: BorderSide(
-                                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                                          width: 1,
-                                        ),
-                                      ),
-                                    ),
-                                    code: TextStyle(
-                                      fontFamily: 'monospace',
-                                      color: primary,
-                                      backgroundColor: isDark ? AppColors.surfaceElevatedDark : AppColors.surfaceAltLight,
-                                    ),
-                                    codeblockDecoration: BoxDecoration(
-                                      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: AppColors.borderDark.withAlpha(80)),
-                                    ),
-                                  ),
-                                ),
-
-                                // Visual Exercise Guides Carousel if workout routine detected
-                                if (matchingGuides.isNotEmpty) ...[
-                                  const SizedBox(height: 14),
-                                  _ExerciseGuideCarousel(
-                                    guides: matchingGuides,
-                                    isTamil: settings.isTamil,
-                                  ),
-                                ],
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
+                    // Regular Message: User or Clean AI Response
+                    if (msg.isUser) {
+                      return _UserMessageBubble(
+                        text: msg.text,
+                        timestamp: msg.timestamp,
+                        primaryColor: primary,
+                        isDark: isDark,
+                      );
+                    } else {
+                      return _AiMessageCard(
+                        msg: msg,
+                        isTamil: settings.isTamil,
+                        isDark: isDark,
+                        primaryColor: primary,
+                      );
+                    }
                   },
                 ),
               ),
 
-              // ── Input Bar ────────────────────────────────
+              // ── Modern Floating Input Bar ────────────────────
               Container(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                 decoration: BoxDecoration(
@@ -546,7 +806,7 @@ class _AiChatPageState extends State<AiChatPage> {
                             hintText: settings.isTamil
                                 ? 'பயிற்சி, உணவு, அல்லது பழக்கங்களை நிர்வகிக்க கேட்கவும்...'
                                 : 'Ask to add habits, check streak, or plan workout...',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide(color: isDark ? AppColors.borderDark.withAlpha(77) : AppColors.borderLight),
@@ -573,6 +833,530 @@ class _AiChatPageState extends State<AiChatPage> {
           ),
         );
       },
+    );
+  }
+
+  // ── ChatGPT / Gemini / Claude Style Navigation Drawer ─────────────
+  Widget _buildChatHistoryDrawer(
+    BuildContext context,
+    SettingsState settings,
+    bool isDark,
+    Color primary,
+  ) {
+    // Group sessions by relative date
+    final groupedSessions = <String, List<ChatSession>>{};
+    for (final s in _sessions) {
+      final group = ChatSession.getSessionGroup(s.updatedAt, settings.isTamil);
+      groupedSessions.putIfAbsent(group, () => []).add(s);
+    }
+
+    return Drawer(
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header with "+ New Chat" button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: primary.withAlpha(30),
+                        ),
+                        child: Icon(Icons.auto_awesome, color: primary, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'VibeForge AI',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            Text(
+                              settings.isTamil ? 'உரையாடல் வரலாறு' : 'Chat History',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Prominent "+ New Chat" Action Button
+                  InkWell(
+                    onTap: () => _createNewSession(settings),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            primary.withAlpha(40),
+                            primary.withAlpha(15),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: primary.withAlpha(90)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_rounded, color: primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            settings.isTamil ? 'புதிய உரையாடல்' : '+ New Chat',
+                            style: TextStyle(
+                              color: primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            // Session List grouped by date
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                children: [
+                  for (final entry in groupedSessions.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+                      child: Text(
+                        entry.key,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                        ),
+                      ),
+                    ),
+                    for (final session in entry.value)
+                      _buildSessionTile(session, settings, isDark, primary),
+                  ],
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+            // Footer with "Clear All History"
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.delete_sweep_outlined, color: AppColors.error, size: 20),
+              title: Text(
+                settings.isTamil ? 'அனைத்து வரலாற்றையும் அழி' : 'Clear All History',
+                style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              onTap: () => _clearAllHistory(settings),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionTile(
+    ChatSession session,
+    SettingsState settings,
+    bool isDark,
+    Color primary,
+  ) {
+    final isSelected = session.id == _activeSessionId;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? primary.withAlpha(25)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? primary.withAlpha(90) : Colors.transparent,
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        leading: Icon(
+          isSelected ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+          size: 18,
+          color: isSelected ? primary : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+        ),
+        title: Text(
+          session.title,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: primary),
+              ),
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_horiz_rounded,
+                size: 18,
+                color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+              ),
+              padding: EdgeInsets.zero,
+              onSelected: (val) {
+                if (val == 'rename') {
+                  _renameSession(session, settings);
+                } else if (val == 'delete') {
+                  _deleteSession(session.id, settings);
+                }
+              },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'rename',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_outlined, size: 16),
+                      const SizedBox(width: 8),
+                      Text(settings.isTamil ? 'தலைப்பு மாற்று' : 'Rename'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                      const SizedBox(width: 8),
+                      Text(settings.isTamil ? 'நீக்கு' : 'Delete', style: const TextStyle(color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        onTap: () => _switchSession(session.id),
+      ),
+    );
+  }
+}
+
+// ── Clean User Message Bubble ──────────────────────────────────────
+class _UserMessageBubble extends StatelessWidget {
+  final String text;
+  final DateTime timestamp;
+  final Color primaryColor;
+  final bool isDark;
+
+  const _UserMessageBubble({
+    required this.text,
+    required this.timestamp,
+    required this.primaryColor,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final timeStr = DateFormat('h:mm a').format(timestamp);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.82,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          decoration: BoxDecoration(
+            color: primaryColor.withAlpha(35),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(18),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(4),
+            ),
+            border: Border.all(color: primaryColor.withAlpha(80)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(isDark ? 50 : 10),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SelectableText(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                timeStr,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Clean AI Message Card (Like Gemini / ChatGPT / Claude) ─────────
+class _AiMessageCard extends StatelessWidget {
+  final ChatMessage msg;
+  final bool isTamil;
+  final bool isDark;
+  final Color primaryColor;
+
+  const _AiMessageCard({
+    required this.msg,
+    required this.isTamil,
+    required this.isDark,
+    required this.primaryColor,
+  });
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: msg.text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+            const SizedBox(width: 8),
+            Text(isTamil ? 'உரையாடல் நகலெடுக்கப்பட்டது' : 'Copied to clipboard'),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final matchingGuides = ExerciseGuidesData.findMatching(msg.text);
+    final timeStr = DateFormat('h:mm a').format(msg.timestamp);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.94,
+        ),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceAltDark : AppColors.surfaceAltLight,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
+            bottomRight: Radius.circular(18),
+            bottomLeft: Radius.circular(4),
+          ),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark.withAlpha(90) : AppColors.borderLight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 60 : 15),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Header: AI Avatar + Name Badge + Time
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [primaryColor, AppColors.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withAlpha(80),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.auto_awesome, size: 13, color: Colors.black),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'VibeForge AI',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isTamil ? 'பயிற்சியாளர்' : 'Coach',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  timeStr,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Clean Markdown Typography Body
+            MarkdownBody(
+              data: msg.text,
+              selectable: true,
+              styleSheet: MarkdownStyleSheet(
+                p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.65,
+                      fontSize: 14,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    ),
+                h1: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: primaryColor,
+                ),
+                h2: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: primaryColor,
+                ),
+                h3: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: primaryColor,
+                ),
+                strong: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+                em: TextStyle(
+                  fontStyle: FontStyle.italic,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+                listBullet: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+                horizontalRuleDecoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                code: TextStyle(
+                  fontFamily: 'monospace',
+                  color: primaryColor,
+                  backgroundColor: isDark ? AppColors.surfaceElevatedDark : AppColors.surfaceAltLight,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.borderDark.withAlpha(90)),
+                ),
+              ),
+            ),
+
+            // Visual Exercise Guides Carousel if workout routine is detected
+            if (matchingGuides.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExerciseGuideCarousel(
+                guides: matchingGuides,
+                isTamil: isTamil,
+              ),
+            ],
+
+            const SizedBox(height: 10),
+            // Bottom Action Toolbar (Copy to clipboard, etc.)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: isTamil ? 'நகலெடு' : 'Copy Response',
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 18,
+                  icon: Icon(
+                    Icons.content_copy_rounded,
+                    color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                  ),
+                  onPressed: () => _copyToClipboard(context),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -977,34 +1761,6 @@ class _ExerciseFullCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ChatMessage {
-  final String text;
-  final bool isUser;
-  final bool isWelcome;
-  final bool isToolStep;
-
-  _ChatMessage({
-    required this.text,
-    required this.isUser,
-    this.isWelcome = false,
-    this.isToolStep = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'text': text,
-        'isUser': isUser,
-        'isWelcome': isWelcome,
-        'isToolStep': isToolStep,
-      };
-
-  factory _ChatMessage.fromJson(Map<String, dynamic> json) => _ChatMessage(
-        text: json['text'] as String? ?? '',
-        isUser: json['isUser'] as bool? ?? false,
-        isWelcome: json['isWelcome'] as bool? ?? false,
-        isToolStep: json['isToolStep'] as bool? ?? false,
-      );
 }
 
 class _SuggestionChip extends StatelessWidget {

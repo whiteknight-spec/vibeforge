@@ -7,6 +7,7 @@ import 'package:vibeforge/features/checklist/presentation/bloc/checklist_bloc.da
 import 'package:vibeforge/features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'package:vibeforge/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:vibeforge/features/ai_assistant/domain/ai_agent_service.dart';
+import 'package:vibeforge/features/ai_assistant/domain/chat_session.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -369,5 +370,41 @@ void main() {
       AppColors.setPalette('matrix_emerald');
       expect(AppColors.primary, AppColors.palettes['matrix_emerald']!.primary);
     });
+
+    test('ChatSession & ChatMessage: serialization, title generation, and date grouping', () {
+      final now = DateTime.now();
+      final msg1 = ChatMessage(text: 'na oru beginner enaku home workouts kudu', isUser: true, timestamp: now);
+      final msg2 = ChatMessage(text: 'Here are 3 home workouts', isUser: false, timestamp: now);
+
+      final session = ChatSession(
+        id: 'test_session_1',
+        title: ChatSession.generateTitle(msg1.text),
+        createdAt: now,
+        updatedAt: now,
+        messages: [msg1, msg2],
+      );
+
+      expect(session.title, contains('na oru beginner'));
+      expect(session.messages.length, 2);
+
+      // JSON serialization
+      final json = session.toJson();
+      final restored = ChatSession.fromJson(json);
+
+      expect(restored.id, 'test_session_1');
+      expect(restored.title, session.title);
+      expect(restored.messages.length, 2);
+      expect(restored.messages.first.text, msg1.text);
+      expect(restored.messages.first.isUser, true);
+      expect(restored.messages.last.isUser, false);
+
+      // Date Grouping
+      expect(ChatSession.getSessionGroup(now, false), 'Today');
+      expect(ChatSession.getSessionGroup(now, true), 'இன்று');
+      expect(ChatSession.getSessionGroup(now.subtract(const Duration(days: 1)), false), 'Yesterday');
+      expect(ChatSession.getSessionGroup(now.subtract(const Duration(days: 3)), false), 'Previous 7 Days');
+      expect(ChatSession.getSessionGroup(now.subtract(const Duration(days: 14)), false), 'Older Chats');
+    });
   });
 }
+

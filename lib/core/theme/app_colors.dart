@@ -214,6 +214,7 @@ class AppColors {
   static const Color textTertiaryDark = Color(0xFF636672); // Subtle Titanium
   static const Color textPrimaryLight = Color(0xFF121417);
   static const Color textSecondaryLight = Color(0xFF5F6368);
+  static const Color textTertiaryLight = Color(0xFF80868B);
 
   // ── Streak (Warm Flame & Sun Ember) ───────────────────────────
   static const Color streakFire = Color(0xFFFF5722);
