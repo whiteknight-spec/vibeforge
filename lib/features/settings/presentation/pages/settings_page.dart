@@ -234,8 +234,10 @@ class SettingsPage extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(state.isTamil ? 'ரத்துசெய்' : 'Cancel')),
           ElevatedButton(
             onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context.read<SettingsBloc>().add(UpdateUserName(controller.text));
+              final trimmed = controller.text.trim();
+              if (trimmed.isNotEmpty) {
+                final safeName = trimmed.length > 40 ? trimmed.substring(0, 40) : trimmed;
+                context.read<SettingsBloc>().add(UpdateUserName(safeName));
                 Navigator.pop(ctx);
               }
             },

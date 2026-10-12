@@ -100,14 +100,9 @@ class _TransformationTimelinePageState extends State<TransformationTimelinePage>
       };
 
       if (existingIdx >= 0) {
-        // Delete old file if it exists
-        final oldPath = stored[existingIdx]['photoPath'];
-        if (oldPath != null) {
-          final oldFile = File(oldPath);
-          if (oldFile.existsSync()) {
-            try { oldFile.deleteSync(); } catch (_) {}
-          }
-        }
+        // Delete old file if it exists safely within sandbox
+        final oldPath = stored[existingIdx]['photoPath'] as String?;
+        await _safeDeletePhotoFile(oldPath);
         stored[existingIdx] = photoEntry;
       } else {
         stored.add(photoEntry);
@@ -190,19 +185,32 @@ class _TransformationTimelinePageState extends State<TransformationTimelinePage>
     ));
   }
 
+  /// Security: Ensures file deletion cannot escape the transformation_photos sandbox directory
+  Future<void> _safeDeletePhotoFile(String? rawPath) async {
+    if (rawPath == null || rawPath.isEmpty) return;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final photosDir = Directory('${appDir.path}/transformation_photos');
+      if (!photosDir.existsSync()) return;
+      final canonicalDir = photosDir.resolveSymbolicLinksSync();
+      final targetFile = File(rawPath);
+      if (targetFile.existsSync()) {
+        final canonicalTarget = targetFile.resolveSymbolicLinksSync();
+        if (canonicalTarget.startsWith(canonicalDir)) {
+          targetFile.deleteSync();
+        }
+      }
+    } catch (_) {}
+  }
+
   void _deletePhoto(Map<String, dynamic> photo) async {
     final stored = _photosBox.get('photos', defaultValue: []) as List;
     stored.removeWhere((p) => p is Map && p['dateKey'] == photo['dateKey']);
     await _photosBox.put('photos', stored);
 
-    // Delete file
-    final path = photo['photoPath'];
-    if (path != null) {
-      final file = File(path);
-      if (file.existsSync()) {
-        try { file.deleteSync(); } catch (_) {}
-      }
-    }
+    // Delete file safely inside sandbox
+    final path = photo['photoPath'] as String?;
+    await _safeDeletePhotoFile(path);
 
     _loadPhotos();
   }

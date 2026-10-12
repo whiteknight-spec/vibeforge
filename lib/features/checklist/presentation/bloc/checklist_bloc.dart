@@ -216,10 +216,18 @@ class ChecklistBloc extends Bloc<ChecklistEvent, ChecklistState> {
   }
 
   Future<void> _onAddCustom(AddCustomItem event, Emitter<ChecklistState> emit) async {
+    final trimmed = event.title.trim();
+    if (trimmed.isEmpty) return;
+    final safeTitle = trimmed.length > 80 ? trimmed.substring(0, 80) : trimmed;
+    final trimmedTa = event.titleTa.trim();
+    final safeTitleTa = trimmedTa.isNotEmpty
+        ? (trimmedTa.length > 80 ? trimmedTa.substring(0, 80) : trimmedTa)
+        : safeTitle;
+
     final newItem = ChecklistItem(
       id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-      title: event.title,
-      titleTa: event.titleTa,
+      title: safeTitle,
+      titleTa: safeTitleTa,
       icon: event.icon,
       category: event.category,
       order: state.items.length,
@@ -240,11 +248,18 @@ class ChecklistBloc extends Bloc<ChecklistEvent, ChecklistState> {
   }
 
   Future<void> _onUpdateCustom(UpdateCustomItem event, Emitter<ChecklistState> emit) async {
+    final safeTitle = event.title != null
+        ? (event.title!.trim().length > 80 ? event.title!.trim().substring(0, 80) : event.title!.trim())
+        : null;
+    final safeTitleTa = event.titleTa != null
+        ? (event.titleTa!.trim().length > 80 ? event.titleTa!.trim().substring(0, 80) : event.titleTa!.trim())
+        : null;
+
     final newItems = state.items.map((item) {
       if (item.id == event.itemId && item.isCustom) {
         return item.copyWith(
-          title: event.title ?? item.title,
-          titleTa: event.titleTa ?? item.titleTa,
+          title: (safeTitle != null && safeTitle.isNotEmpty) ? safeTitle : item.title,
+          titleTa: safeTitleTa ?? item.titleTa,
           icon: event.icon ?? item.icon,
           category: event.category ?? item.category,
         );
@@ -258,8 +273,8 @@ class ChecklistBloc extends Bloc<ChecklistEvent, ChecklistState> {
     final customItems = _checklistBox.get('customItems', defaultValue: []) as List;
     for (int i = 0; i < customItems.length; i++) {
       if (customItems[i]['id'] == event.itemId) {
-        if (event.title != null) customItems[i]['title'] = event.title;
-        if (event.titleTa != null) customItems[i]['titleTa'] = event.titleTa;
+        if (safeTitle != null && safeTitle.isNotEmpty) customItems[i]['title'] = safeTitle;
+        if (safeTitleTa != null) customItems[i]['titleTa'] = safeTitleTa;
         if (event.icon != null) customItems[i]['icon'] = event.icon;
         if (event.category != null) customItems[i]['category'] = event.category;
         break;
