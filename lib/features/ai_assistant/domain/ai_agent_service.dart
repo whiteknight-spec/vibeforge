@@ -754,16 +754,39 @@ class AiAgentService {
         final toolName = call['name'] as String;
         final args = (call['args'] as Map<String, dynamic>?) ?? {};
 
-        steps.add('🔧 [Tool Call] $toolName(${args.isNotEmpty ? jsonEncode(args) : ""})');
-
         final toolResult = await _dispatchTool(toolName, args);
         executedResults.add(toolResult);
 
-        // Verification logging
+        // Friendly human-readable action summaries
         if (toolResult.success) {
-          steps.add('✅ [Verified] ${toolResult.message}');
+          if (toolName == 'batchCreateHabits') {
+            final tasks = args['tasks'];
+            final count = tasks is List ? tasks.length : 1;
+            steps.add(isTamil
+                ? '✅ $count புதிய பயிற்சிகளை உங்கள் தினசரி பட்டியலில் சேர்த்துள்ளேன்.'
+                : '✅ Added $count workout habits directly to your daily checklist.');
+          } else if (toolName == 'createChecklistItem') {
+            final title = args['title'] ?? 'பயிற்சி';
+            steps.add(isTamil
+                ? '✅ "$title" பணியை உங்கள் பட்டியலில் சேர்த்துள்ளேன்.'
+                : '✅ Added "$title" directly to your daily checklist.');
+          } else if (toolName == 'getChecklist') {
+            steps.add(isTamil
+                ? '📋 உங்கள் தற்போதைய பழக்கவழக்க நிலையை சரிபார்த்துள்ளேன்.'
+                : '📋 Inspected your current habit tracker status.');
+          } else if (toolName == 'toggleChecklistItem') {
+            steps.add(isTamil
+                ? '⚡ பணியின் நிலையை புதுப்பித்துள்ளேன்.'
+                : '⚡ Updated habit completion status.');
+          } else if (toolName == 'addBodyMeasurement') {
+            steps.add(isTamil
+                ? '📊 உடல் எடை மற்றும் அளவீடுகளை பதிவு செய்துள்ளேன்.'
+                : '📊 Logged your body stats & measurements.');
+          } else {
+            steps.add('✅ ${toolResult.message}');
+          }
         } else {
-          steps.add('❌ [Failed] ${toolResult.message}');
+          steps.add('❌ ${toolResult.message}');
         }
 
         toolResponses.add({
