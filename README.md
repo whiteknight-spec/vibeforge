@@ -17,7 +17,7 @@ A modern, fast, and responsive cross-platform mobile application built using **F
 
 You can directly download and install the latest APK on your Android device:
 
-👉 **[Download Latest APK](https://github.com/YOUR_GITHUB_USERNAME/vibeforge/releases)**
+👉 **[Download Latest APK](https://github.com/whiteknight-spec/vibeforge/releases)**
 
 > **Note:** During installation, if Android displays *"Install unknown apps"*, enable **Allow from this source** in Settings to proceed.
 
